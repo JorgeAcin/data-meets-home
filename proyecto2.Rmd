@@ -1,0 +1,43 @@
+---
+title: "proyecto2"
+output: word_document
+date: "2025-02-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+install.packages("readxl")
+library('readxl')
+install.packages('dplyr')
+library(dplyr)
+
+library(dplyr)
+install.packages('sf')
+library(sf)
+```
+
+```{r datos, echo=TRUE}
+# Instalar el paquete si no lo tienes
+install.packages("readxl")
+
+# Cargar el paquete
+library(readxl)
+
+# Leer un archivo Excel (.xlsx o .xls)
+datos <- read_excel("propiedades_valencia.xlsx")
+
+# Ver las primeras filas
+View(datos)
+Valencia_Sale <- as.data.frame(st_drop_geometry(Valencia_Sale))
+duplicados = Valencia_Sale[duplicated(Valencia_Sale$ASSETID) | duplicated(Valencia_Sale$ASSETID, fromLast = TRUE), ]
+View(duplicados)
+
+duplicados2 = duplicados %>% group_by(ASSETID) %>% filter(PRICE == min(PRICE))
+eliminar_dup = anti_join(duplicados, duplicados2, by = c("ASSETID", "PRICE"))
+Valencia_Sale <- anti_join(Valencia_Sale, eliminar_dup, by = c("ASSETID", "PRICE"))
+
+View(duplicados2)
+                  
+
+```
