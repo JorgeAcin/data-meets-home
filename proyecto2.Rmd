@@ -17,17 +17,22 @@ install.packages('sf')
 library(sf)
 ```
 
-```{r datos, echo=TRUE}
+```{r API, echo=TRUE}
 # Leer un archivo Excel (.xlsx o .xls)
 datos <- read_excel("propiedades_valencia.xlsx")
 # Ver las primeras filas
 View(datos)
+```
 
+Cargamos la base de datos de idealista 2018 y eliminamos los valores duplicados que aparecen en esta, quedandonos con la opción de menor precio para cada casa.
+
+```{r idealista, echo=TRUE}
 load('Valencia_Sale.rda')
-
 Valencia_Sale <- as.data.frame(st_drop_geometry(Valencia_Sale)) # creamos el dataframe
+
 duplicados <- Valencia_Sale %>% group_by(ASSETID) %>% filter(n() > 1) %>% ungroup() # guardamos los duplicados
 duplicados_buenos = duplicados %>% group_by(ASSETID) %>% filter(PRICE == min(PRICE)) %>% slice_head(n = 1) %>% ungroup() # de los duplicados, nos quedamos los de menor precio
+
 Valencia_Sale <- anti_join(Valencia_Sale, duplicados, by = c("ASSETID", "PRICE")) # eliminamos los duplicados de la base de datos
 Valencia_Sale <- rbind(Valencia_Sale, duplicados_buenos) # añadimos los duplicados buenos que nos queremos quedar
 
@@ -35,9 +40,8 @@ View(Valencia_Sale)
                   
 ```
 
-```{r }
-summary(Valencia_Sale)
-duplicados = Valencia_Sale[duplicated(Valencia_Sale$ASSETID) | duplicated(Valencia_Sale$ASSETID, fromLast = TRUE), ]
+Realizamos un summary de las variables para observar valores anómalos o posibles variables que debamos eliminar.
 
-View(duplicados)
+```{r summary, echo=TRUE}
+summary(Valencia_Sale)
 ```
