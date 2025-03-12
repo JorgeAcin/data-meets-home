@@ -41,7 +41,12 @@ View(Valencia_Sale)
 ```
 
 Realizamos un summary de las variables para observar valores anómalos o posibles variables que debamos eliminar.
+Eliminamos CONSTRUCTIONYEAR ya que contiene muchos valores faltantes y atípicos. Además no es una variable importante ya que CADCONSTRUCTIONYEAR realiza la misma función y de forma más correcta. 
+En esta última variable vemos un valor anómalo que es 1591 (una fecha demasiado antigua), que podemos eliminar sin problema.
 
 ```{r summary, echo=TRUE}
+summary(Valencia_Sale)
+Valencia_Sale$CONSTRUCTIONYEAR <- NULL
+Valencia_Sale <- Valencia_Sale[Valencia_Sale$CADCONSTRUCTIONYEAR != 1591, ]
 summary(Valencia_Sale)
 ```
