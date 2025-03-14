@@ -40,13 +40,25 @@ View(Valencia_Sale)
                   
 ```
 
-Realizamos un summary de las variables para observar valores anómalos o posibles variables que debamos eliminar.
-Eliminamos CONSTRUCTIONYEAR ya que contiene muchos valores faltantes y atípicos. Además no es una variable importante ya que CADCONSTRUCTIONYEAR realiza la misma función y de forma más correcta. 
-En esta última variable vemos un valor anómalo que es 1591 (una fecha demasiado antigua), que podemos eliminar sin problema.
+Realizamos un summary de las variables para observar valores anómalos o posibles variables que debamos eliminar:
+  - Eliminamos CONSTRUCTIONYEAR ya que contiene muchos valores faltantes y atípicos. Además no es una variable importante ya que CADCONSTRUCTIONYEAR realiza la misma función y de forma más correcta. 
+  - En esta última variable vemos dos valores anómalos que son 1591 y 1671 (unas fechas demasiado antiguas), que podemos eliminar sin problema.
+  - Hemos encontrado una vivienda con 81 habitaciones, algo imposible para los 90m^2 que posee. Por esta razón, hemos decidido eliminarla.
+  - Después de eliminar la vivienda anómala, hemos observado dos viviendas con 15 habitaciones, pero estas parecen correctas debido a que su precio y m^2 es razonablemente alto.
+  - Hemos identificado una vivienda con 8 habitaciones y 12 baños, valor que consideramos anómalo por lo que eliminamos la fila.
+  - Eliminamos también la variable PARKINGSPACEPRICE dado que no nos aporta información relevante y contiene muchos datos anómalos (precios de 1€).
+  - Justificar estudios
 
 ```{r summary, echo=TRUE}
-summary(Valencia_Sale)
 Valencia_Sale$CONSTRUCTIONYEAR <- NULL
-Valencia_Sale <- Valencia_Sale[Valencia_Sale$CADCONSTRUCTIONYEAR != 1591, ]
+Valencia_Sale <- Valencia_Sale[Valencia_Sale$CADCONSTRUCTIONYEAR != 1591 & Valencia_Sale$CADCONSTRUCTIONYEAR != 1671, ]
+Valencia_Sale <- Valencia_Sale[Valencia_Sale$ROOMNUMBER != 81, ]
+Valencia_Sale <- Valencia_Sale[Valencia_Sale$BATHNUMBER != 12, ]
+Valencia_Sale$PARKINGSPACEPRICE <- NULL
 summary(Valencia_Sale)
+
+estudios = Valencia_Sale[Valencia_Sale$ROOMNUMBER == 0, ]
+Valencia_Sale <- anti_join(Valencia_Sale, estudios)
+
+Valencia_Sale[Valencia_Sale$ROOMNUMBER == 0, ]
 ```
