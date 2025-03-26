@@ -11,8 +11,6 @@ install.packages("readxl")
 library('readxl')
 install.packages('dplyr')
 library(dplyr)
-
-library(dplyr)
 install.packages('sf')
 library(sf)
 ```
@@ -40,6 +38,8 @@ View(Valencia_Sale)
                   
 ```
 
+### AED / Limpieza y Filtrado de la base
+
 Realizamos un summary de las variables para observar valores anómalos o posibles variables que debamos eliminar:
   - Eliminamos CONSTRUCTIONYEAR ya que contiene muchos valores faltantes y atípicos. Además no es una variable importante ya que CADCONSTRUCTIONYEAR realiza la misma función y de forma más correcta. 
   - En esta última variable vemos dos valores anómalos que son 1591 y 1671 (unas fechas demasiado antiguas), que podemos eliminar sin problema.
@@ -47,7 +47,33 @@ Realizamos un summary de las variables para observar valores anómalos o posible
   - Después de eliminar la vivienda anómala, hemos observado dos viviendas con 15 habitaciones, pero estas parecen correctas debido a que su precio y m^2 es razonablemente alto.
   - Hemos identificado una vivienda con 8 habitaciones y 12 baños, valor que consideramos anómalo por lo que eliminamos la fila.
   - Eliminamos también la variable PARKINGSPACEPRICE dado que no nos aporta información relevante y contiene muchos datos anómalos (precios de 1€).
-  - Justificar estudios
+  - Eliminamos la variable FLATLOCATIONID ya que cuenta con más de 4000 datos faltantes, un número considerable, y no es una variable muy relevante para el análisis.
+
+Por otra parte hemos comparado si el FLOORCLEAN (nº de piso) concorda con el nº de piso máx. registrado en el catastro.
+Se han encontrado 1028 pisos con un FLOORCLEAN > CADMAXBUILDINGFLOOR, no obstante, después de habernos informado sobre el tema, hemos llegado a las siguientes posibilidades:
+
+      -> La posible existencia de entreplantas o plantas técnicas
+
+En algunos edificios, hay plantas intermedias (como mezzanines, plantas técnicas o plantas de instalaciones) que no se cuentan en la numeración habitual pero sí en el Catastro.
+
+      -> Modificaciones en la estructura del edificio
+
+Si se han hecho reformas o ampliaciones, la numeración interna del edificio pudo cambiar, pero el Catastro puede reflejar la estructura original.
+
+
+Siguiendo esta línea hemos averiguado los anuncios con más baños que habitaciones (algo poco habitual), y separamos en 2 casos:
+
+1. Los pisos con 0 habitaciones y baños, son estudios, es totalmente normal que tenga baño/s.
+
+2. Habiendo observado las viviendas con más baños que viviendas, hemos apreciado que la mayoría tienen un precio muy elevado, y esto justificaría el mayor nº de baños. 
+Muchas casas grandes o de lujo tienen un baño privado en cada habitación (en suite), más baños adicionales para visitas o zonas comunes --> Ejemplo: Una mansión con 3 dormitorios y 5 baños (baños en cada habitación, uno de servicio y uno de cortesía).
+
+Por lo tanto dejaremos estas viviendas anunciadas en la base de datos.
+
+Continuamos con pisos que no son estudios y tienen 0 habitaciones (contamos con 40). No los tendremos en cuenta en nuestro estudio, ya que no nos aportan nada al proyecto y la mayoría son datos anómalos erróneos.
+
+- Separamos de la base de datos las viviendas con 0 habitaciones ya que estas son estudios según Idealista. Esto lo 
+
 
 ```{r summary, echo=TRUE}
 Valencia_Sale$CONSTRUCTIONYEAR <- NULL
@@ -55,10 +81,30 @@ Valencia_Sale <- Valencia_Sale[Valencia_Sale$CADCONSTRUCTIONYEAR != 1591 & Valen
 Valencia_Sale <- Valencia_Sale[Valencia_Sale$ROOMNUMBER != 81, ]
 Valencia_Sale <- Valencia_Sale[Valencia_Sale$BATHNUMBER != 12, ]
 Valencia_Sale$PARKINGSPACEPRICE <- NULL
+Valencia_Sale$FLATLOCATIONID <- NULL
 summary(Valencia_Sale)
+table(Valencia_Sale$FLOORCLEAN)
 
-estudios = Valencia_Sale[Valencia_Sale$ROOMNUMBER == 0, ]
-Valencia_Sale <- anti_join(Valencia_Sale, estudios)
+#estudios = Valencia_Sale[Valencia_Sale$ROOMNUMBER == 0, ]
+#Valencia_Sale <- anti_join(Valencia_Sale, estudios)
 
-Valencia_Sale[Valencia_Sale$ROOMNUMBER == 0, ]
+# viviendas donde FLOORCLEAN > CADMAXBUILDINGFLOOR
+catastros_erroneos <- subset(Valencia_Sale, FLOORCLEAN > CADMAXBUILDINGFLOOR)
+# viviendas donde BATHNUMBER > ROOMNUMBER y no son estudios
+banyos_erroneos <- subset(Valencia_Sale, BATHNUMBER > ROOMNUMBER & ROOMNUMBER > 0)
+
+no_estudios <- subset(Valencia_Sale, ISSTUDIO == 1 & ROOMNUMBER != 0)
+
+# eliminamos las viviendas abiertas que no tienen habitaciones y no son estudios
+pisos_abiertos <- subset(Valencia_Sale, ISSTUDIO != 1 & ROOMNUMBER == 0)
+Valencia_Sale <- anti_join(Valencia_Sale, pisos_abiertos, by = c("ASSETID", "PRICE"))
+
+descVal <- data.frame(
+  "variable" = colnames(Valencia_Sale),
+  "tipo" = c(rep("categorical", 2), rep("numerical", 36)), 
+  stringsAsFactors = FALSE
+)
+```
+
+```{r PCA, echo=TRUE}
 ```
