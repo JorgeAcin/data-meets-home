@@ -1,0 +1,300 @@
+---
+title: "MDP I"
+output: word_document
+date: "2025-02-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+```
+Carga de librerías
+Primero se cargan las librerías necesarias para la lectura de archivos Excel (readxl) y para la manipulación de datos (dplyr).
+
+```{r librerias, include=FALSE}
+library('readxl')
+library(dplyr)
+library(FactoMineR)
+library(factoextra)
+library(corrplot)
+library(gridExtra)
+library(grid)
+```
+Lectura de datos
+
+A continuación, se carga el archivo de datos, se muestran las dimensiones y las primeras filas del dataset, y se crea un resumen estadístico. Además, se crea un data frame descFut que contiene el nombre de las variables y su tipo, este data frame es útil para realizar operaciones específicas en función del tipo de variable, como la conversión de tipos de datos o la selección de variables para análisis posteriores.
+
+```{r carga, echo = TRUE}
+# Cargar el archivo de datos
+datos = read_excel("2022-2023_Football_Player_Stats.xlsx")
+
+# Mostrar las dimensiones del dataset
+dim(datos)
+
+# Mostrar las primeras 3 filas del dataset
+head(datos, 3)
+
+# Resumen estadístico del dataset
+summary(datos)
+
+# Crear un data frame con el nombre de las variables y su tipo
+descFut = data.frame("variable" = colnames(datos),
+                      "tipo" = c("text", rep("categorical", 4), rep("numerical", 51)), stringsAsFactors = FALSE)
+```
+Conversión de variables
+
+Como algunas variables del dataset eran de tipo string cuando tendíran que ser de tipo númerico, se convierten a tipo numérico utilizando el data frame descFut.
+
+```{r conversión, echo = TRUE}
+# Convertir variables de tipo string a tipo numérico según descFut
+numerical_vars <- descFut$variable[descFut$tipo == "numerical"]
+
+datos[numerical_vars] <- lapply(datos[numerical_vars], function(x) {
+  as.numeric(as.character(x))
+})
+```
+
+Filtrado de datos
+
+Se filtran los datos para eliminar los jugadores que hayan jugado menos de 5 partidos o menos de 200 minutos ya que estos no son relevantes para el objetivo del estudio. Además, los jugadores que habían jugado en varios equipos salían en más de una fila, para evitar esta discrepancia se han agrupado los jugadores (filas) con nombres idénticos y se han borrado las filas de estos que tenían menos minutos disputados.
+
+```{r filtrado, echo = TRUE}
+# eliminamos los datos que tengan MatchP < 5 o < 200 minutos
+datos <- datos[datos$MatchP >= 5 & datos$Min >= 200, ]
+duplicados = datos[duplicated(datos$Player) | duplicated(datos$Player, fromLast = TRUE), ]
+
+# agrupamos por nombre y edad, y nos quedamos con el que haya jugado más minutos
+duplicados2 = duplicados %>% group_by(Player, Age) %>% filter(Min == max(Min))
+eliminar_dup = anti_join(duplicados, duplicados2, by = c("Player", "Min"))
+datos <- anti_join(datos, eliminar_dup, by = c("Player", "Min"))
+```
+Análisis estadístico
+
+Para comprobar que no hay datos anómalos, constantes o inconsistentes se realiza un análisis estadístico de las variables numéricas, calculando la desviación estándar, la media y el coeficiente de variación. Finalmente, se ordena el coeficiente de variación.
+
+```{r analisis_estadistico, echo=TRUE}
+summary(datos[,descFut$variable[descFut$tipo == "numerical"]])
+mySD = apply(datos[,descFut$variable[descFut$tipo == "numerical"]], 2, sd)
+myMU = colMeans(datos[,descFut$variable[descFut$tipo == "numerical"]])
+myCV = mySD/myMU
+sort(myCV)
+```
+Solo encontramos un dato faltante, en la fila 1877, falta 1 valor en la variable categórica nominal Nation, referente al país del jugador David Ozoh. Al ser solamente 1 valor faltante y pudiendo consultarlo fácilmente, le hemos añadido manualmente el valor “ENG”, correspondiente al país de Inglaterra.
+Observando el resumen estadístico no se identificó ninguna variable constante o datos inconsistentes, para una exploración más en detalle se procede a hacer la visualización de estos datos a continuación.
+
+Visualización de datos
+Para visualizar la distribución de las variables numéricas, se crea un diagrama de cajas y bigotes. Se excluye la variable Min para evitar que su escala desproporcionada afecte la visualización de las otras variables.
+
+```{r }
+# Aplicar una transformación logarítmica a las variables numéricas
+datos_log <- datos
+datos_log[numerical_vars] <- lapply(datos_log[numerical_vars], function(x) log1p(x))
+
+# Excluir la variable "Min" de numerical_vars
+numerical_vars_without_min <- setdiff(numerical_vars, "Min")
+
+par(mar = c(9,4,2,2))
+boxplot(datos_log[, numerical_vars_without_min], las = 2, main = "Boxplot de Variables Numéricas (Transformación Logarítmica)")
+```
+
+Visualización de datos con transformación logarítmica
+Para mejorar la comparabilidad de las variables, se aplica una transformación logarítmica a las variables numéricas.
+
+```{r}
+# Aplicar una transformación logarítmica a las variables numéricas
+datos_log <- datos
+datos_log[numerical_vars] <- lapply(datos_log[numerical_vars], function(x) log1p(x))
+
+par(mar = c(9,4,2,2))
+boxplot(datos_log[, numerical_vars_without_min], las = 2, main = "Boxplot de Variables Numéricas (Transformación Logarítmica)")
+```
+
+Visualización de datos en grupos
+Para mejorar la legibilidad, se dividen las variables en grupos más pequeños y se crean varios gráficos de boxplot.
+
+```{r}
+# Dividir las variables en grupos más pequeños para mejorar la legibilidad
+num_vars <- descFut$variable[descFut$tipo == "numerical"]
+
+# Calcular los rangos de las variables
+variable_ranges <- sapply(datos[, num_vars], function(x) max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+
+# Agrupar las variables en categorías lógicas basadas en su magnitud
+group_large <- names(variable_ranges[variable_ranges > 100])
+group_medium <- names(variable_ranges[variable_ranges <= 100 & variable_ranges > 10])
+group_small <- names(variable_ranges[variable_ranges <= 10])
+
+# Crear una lista de grupos
+num_vars_groups <- list(
+  "Large Magnitude" = group_large,
+  "Medium Magnitude" = group_medium,
+  "Small Magnitude" = group_small
+)
+
+par(mfrow = c(2, 2), mar = c(9,4,2,2))  # Dividir la ventana gráfica en una cuadrícula de 2x2
+for (group_name in names(num_vars_groups)) {
+  group <- num_vars_groups[[group_name]]
+  boxplot(datos[, group], las = 2, main = paste("Boxplot de Variables Numéricas (", group_name, ")", sep = ""))
+}
+```
+
+Selección del número de PCs
+
+```{r }
+datos2 = datos
+datos2[1:5]
+datos2[, numerical_vars] = scale(datos[, numerical_vars], center = TRUE, scale = TRUE)
+res.pca = PCA(datos2, scale.unit = FALSE, graph = FALSE, ncp = 10, 
+        quali.sup = 1:5)
+eig.val <- get_eigenvalue(res.pca)
+VPmedio = 100 * (1/nrow(eig.val))
+fviz_eig(res.pca, addlabels = TRUE) +
+    geom_hline(yintercept=VPmedio, linetype=2, color="red")
+```
+
+```{r }
+kable(eig.val[1:10,])
+```
+
+```{r }
+K = 6 #Cambiar: Seleccionar número de componentes después de la limpieza
+res.pca = PCA(datos2, scale.unit = FALSE, graph = FALSE, ncp = K, quali.sup = 1:5)
+```
+Validación del modelo PCA
+
+Detección de anómalos con T2-Hotelling
+
+```{r }
+misScores = res.pca$ind$coord[,1:K]
+miT2 = colSums(t(misScores**2)/eig.val[1:K,1])
+I = nrow(datos2)
+F95 = K*(I**2 - 1)/(I*(I - K)) * qf(0.95, K, I-K)
+F99 = K*(I**2 - 1)/(I*(I - K)) * qf(0.99, K, I-K)
+
+plot(1:length(miT2), miT2, type = "p", xlab = "Jugadores", ylab = "T2")
+abline(h = F95, col = "orange", lty = 2, lwd = 2)
+abline(h = F99, col = "red3", lty = 2, lwd = 2)
+```
+Anomalos
+```{r}
+anomalas = which(miT2 > F99)
+anomalas
+datos[41, ]
+```
+
+```{r }
+p1 = fviz_pca_ind(res.pca, axes = c(1,2), geom = c("point"),
+                  habillage = factor(miT2 > F95))
+
+p2 = fviz_pca_ind(res.pca, axes = c(1,3), geom = c("point"), 
+                  habillage = factor(miT2 > F95)) 
+  
+
+grid.arrange(p1,p2, nrow = 1)
+```
+
+```{r }
+contribT2 = function (X, scores, loadings, eigenval, observ, cutoff = 2) {
+  # X is data matrix and must be centered (or centered and scaled if data were scaled)
+  misScoresNorm = t(t(scores**2) / eigenval)
+  misContrib = NULL
+  for (oo in observ) {
+    print(rownames(scores)[oo])
+    print(scores[oo,])
+    misPCs = which(as.numeric(misScoresNorm[oo,]) > cutoff)
+    lacontri = sapply(misPCs, function (cc) (scores[oo,cc]/eigenval[cc])*loadings[,cc]*X[oo,])
+    lacontri = rowSums((1*(sign(lacontri) == 1))*lacontri)
+    misContrib = cbind(misContrib, lacontri)
+  }
+  colnames(misContrib) = rownames(misScoresNorm[observ,])
+  return(misContrib)
+}
+```
+
+```{r }
+# Selección y escalado de variables numéricas relevantes
+datosNumericos = datos2[,descFut$tipo == "numerical"]
+datosNumericos = datosNumericos[,setdiff(colnames(datosNumericos), c("Player", "Nation", "Pos", "Team", "League"))]
+datosNumericos = scale(datosNumericos, center = TRUE, scale = TRUE)
+X = as.matrix(datosNumericos)
+# Calculamos los loadings a partir de las coordenadas de las variables
+# ya que la librería FactoMineR nos devuelve los loadings ponderados 
+# por la importancia de cada componente principal.
+misLoadings = sweep(res.pca$var$coord, 2, sqrt(res.pca$eig[1:K,1]), FUN="/")
+# Calculamos las contribuciones
+mycontrisT2 = contribT2(X = X, scores = misScores, loadings = misLoadings, 
+                        eigenval = eig.val[1:K,1], observ = which.max(miT2),
+                        cutoff = 2)
+```
+```{r }
+par(mar = c(10,2.3,3,1))
+barplot(mycontrisT2[,1],las=2, #cex.names = 0.5,
+        main= paste0("Observación: ", rownames(cereals)[which.max(miT2)]))
+```
+
+```{r }
+par(mar = c(12, 4, 3, 1))  # Aumentar el margen inferior y el izquierdo para las etiquetas
+
+# Seleccionar las 10 contribuciones más altas
+top10_contribs <- sort(mycontrisT2[,1], decreasing = TRUE)[1:10]
+
+# Crear el gráfico de barras con las 10 mayores contribuciones
+barplot(top10_contribs, 
+        las = 2,           # Rotar las etiquetas del eje x
+        cex.names = 0.8,   # Reducir el tamaño de las etiquetas
+        col = "steelblue", # Cambiar el color de las barras
+        main = paste0("Top 10 Contribuciones - Observación: ", rownames(datos2)[which.max(miT2)]),
+        ylab = "Contribución",  # Etiqueta del eje y
+        border = "white")  # Eliminar bordes de las barras
+```
+
+```{r }
+datos[512,]
+```
+
+Distancia al modelo (SCR)
+
+```{r }
+# Ajustar el tamaño del gráfico y corregir la visualización
+par(mar = c(5, 5, 4, 2))  # Ajustar los márgenes para mayor claridad
+plot(1:length(mySCR), mySCR, 
+     type = "l",          # Línea para conectar los puntos
+     main = "Distancia al modelo", 
+     ylab = "SCR", 
+     xlab = "Jugadores", 
+     ylim = c(0, max(mySCR) * 1.1),  # Ajustar el límite superior del eje y
+     cex.lab = 1.5,       # Aumentar el tamaño de las etiquetas de los ejes
+     cex.axis = 1.2,      # Aumentar el tamaño de los valores de los ejes
+     lwd = 2)             # Aumentar el grosor de la línea
+
+# Calcular los límites de chi-cuadrado
+g = var(mySCR) / (2 * mean(mySCR))
+h = (2 * mean(mySCR)^2) / var(mySCR)
+chi2lim = g * qchisq(0.95, df = h)
+chi2lim99 = g * qchisq(0.99, df = h)
+
+# Añadir líneas horizontales para los límites
+abline(h = chi2lim, col = "orange", lty = 2, lwd = 2)  # Línea para el 95%
+abline(h = chi2lim99, col = "red3", lty = 2, lwd = 2)  # Línea para el 99%
+```
+
+```{r }
+ContriSCR = function(E, SCR) {
+  # E es la matriz de residuos del modelo 
+  # SCR es la suma de cuadrados residual
+  contribucion = NULL
+  for (j in 1:length(SCR)){
+    eind<-E[j,]
+    signo<-sign(eind)
+    contri<-(signo*(eind^2)/SCR[j])*100
+    contribucion<-rbind(contribucion,contri)
+  }
+  rownames(contribucion) = rownames(E)
+  return(contribucion)
+}
+## Calculamos las contribuciones de todas las observaciones
+mycontris = ContriSCR(E = myE, SCR = mySCR)
+## Gráfico para Special_K
+barplot(mycontris[512,],las=2, cex.names = 0.7,
+        main=c('Contribuciones a SCR para Jeremy Doku'))
+```
