@@ -1,29 +1,21 @@
 ---
-title: "PROYECTO"
-output:
-  html_document:
-    df_print: paged
-  word_document: default
-  pdf_document: default
-author: ["Rubén Tormo Piles", "Mihai Cristian Mihalache Farcas", "Jorge Acín Zurita", "Robert Torres Mingarro"]
+title: "Proyecto II"
+author: "Mihai"
+date: "2025-03-12"
+output: word_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r instalar, eval=FALSE, include=FALSE}
-install.packages('readxl')
-install.packages('dplyr')
-install.packages('sf')
-install.packages('rmarkdown')
-```
-
 ```{r cargar, include=FALSE}
+library("tinytex")
 library(sf)
 library(dplyr)
 library(readxl)
 library(rmarkdown)
+library(ggplot2)
 ```
 
 ```{r API, eval=FALSE, include=FALSE}
@@ -56,9 +48,11 @@ Valencia_Sale <- rbind(Valencia_Sale, duplicados_buenos) # añadimos los duplica
 
 # Guradamos esto para la limpieza
 summary_df <- as.data.frame(summary(Valencia_Sale)) 
+
+summary(Valencia_Sale)
 ```
 ### Base ya cargada de IDEALISTA 2018 sin duplicados
-`r Valencia_Sale`
+Valencia_Sale
 
 ***
 
@@ -77,6 +71,7 @@ Realizamos un `summary()` de las variables para observar valores anómalos o pos
  - Hemos identificado una vivienda con 8 habitaciones y 12 baños, valor que consideramos anómalo por lo que eliminamos la fila.
  
  - Eliminamos también la variable **PARKINGSPACEPRICE** dado que no nos aporta información relevante y contiene muchos datos anómalos (precios de 1€).
+ A continuación, mostramos mediante la librería **ggplot2** en R, un histograma con la frecuencia de precios de Parking divididos en 2 intervalos (de 0 a 1€ y más de 1€). Como bien apreciamos, la frecuencia de Parkings con el precio de 1€ es enorme, algo que no tiene sentido alguno.
  
  - Eliminamos la variable FLATLOCATIONID ya que cuenta con más de 4000 datos faltantes, un número considerable, y no es una variable muy relevante para el análisis.
 
@@ -84,7 +79,7 @@ Realizamos un `summary()` de las variables para observar valores anómalos o pos
 Por otra parte, hemos comparado si el **FLOORCLEAN** (nº de piso) concuerda con el nº de piso máx. registrado en el catastro.
 Se han encontrado 1028 pisos con un **FLOORCLEAN** > **CADMAXBUILDINGFLOOR**, no obstante, después de habernos informado sobre el tema, hemos llegado a las siguientes posibilidades:
 
- - **La posible existencia de entreplantas o plantas técnicas:** En algunos edificios, hay plantas intermedias (como mezzanines, plantas técnicas o plantas de instalaciones) que no se cuentan en la numeración habitual pero sí en el Catastro.
+ - **La posible existencia de entreplantas o plantas técnicas:** En algunos edificios, hay plantas intermedias (como entresuelos, plantas técnicas o plantas de instalaciones) que no se cuentan en la numeración habitual pero sí en el Catastro.
 
  - **Modificaciones en la estructura del edificio:** Si se han hecho reformas o ampliaciones, la numeración interna del edificio pudo cambiar, pero el Catastro puede reflejar la estructura original.
 
@@ -98,7 +93,7 @@ Muchas casas grandes o de lujo tienen un baño privado en cada habitación (en s
 
 Por lo tanto dejaremos estas viviendas anunciadas en la base de datos.
 
-Continuamos con pisos que no son estudios y tienen 0 habitaciones (contamos con 40). No los tendremos en cuenta en nuestro estudio, ya que no nos aportan nada al proyecto y la mayoría son datos anómalos erróneos.
+Continuamos con pisos que no son estudios y tienen 0 habitaciones (contamos con 40). No los tendremos en cuenta en nuestro proyecto, ya que no nos aportan nada al proyecto y la mayoría son datos anómalos erróneos.
 
 - Separamos de la base de datos las viviendas con 0 habitaciones ya que estas son estudios según Idealista. Esto lo 
 
@@ -110,9 +105,44 @@ Valencia_Sale$CONSTRUCTIONYEAR <- NULL
 # Eliminamos las viviendas de 1591 y 1671
 Valencia_Sale <- Valencia_Sale[Valencia_Sale$CADCONSTRUCTIONYEAR != 1591 & Valencia_Sale$CADCONSTRUCTIONYEAR != 1671, ]
 
+ggplot(Valencia_Sale, aes(x = as.factor(1), y = ROOMNUMBER)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue", notch = TRUE) +
+  coord_flip() +  # Lo hace horizontal
+  labs(title = "Boxplot del Número de Habitaciones",
+       x = "",
+       y = "Número de Habitaciones") +
+  theme_minimal()
+
+ggplot(Valencia_Sale, aes(x = as.factor(1), y = BATHNUMBER)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue", notch = TRUE) +
+  coord_flip() +  # Lo hace horizontal
+  labs(title = "Boxplot del Número de Baños",
+       x = "",
+       y = "Número de Baños") +
+  theme_minimal()
+
+
+
 # Eliminamos las viviendas con 81 habitaciones y 12 baños
 Valencia_Sale <- Valencia_Sale[Valencia_Sale$ROOMNUMBER != 81, ]
 Valencia_Sale <- Valencia_Sale[Valencia_Sale$BATHNUMBER != 12, ]
+
+# Crear una variable categórica para los intervalos
+Valencia_Sale$Precio_Categoria <- cut(Valencia_Sale$PARKINGSPACEPRICE, 
+                                      breaks = c(0, 1, Inf), 
+                                      labels = c("0 - 1€", "> 1€"),
+                                      include.lowest = TRUE)
+
+# Graficar el histograma con ggplot2
+ggplot(Valencia_Sale, aes(x = Precio_Categoria)) +
+  geom_bar(fill = "lightblue", color = "darkblue") +
+  labs(title = "Histograma de Precios de Parking",
+       x = "Intervalos de Precio (€)",
+       y = "Frecuencia") +
+  theme_minimal()
+
+
+
 
 # Eliminamos PARKINGSPACEPRICE
 Valencia_Sale$PARKINGSPACEPRICE <- NULL
@@ -134,9 +164,10 @@ Valencia_Sale <- anti_join(Valencia_Sale, pisos_abiertos, by = c("ASSETID", "PRI
 
 descVal <- data.frame(
   "variable" = colnames(Valencia_Sale),
-  "tipo" = c(rep("categorical", 2), rep("numerical", 36)), 
+  "tipo" = c(rep("categorical", 2), rep("numerical", length(colnames(Valencia_Sale)) - 2)), 
   stringsAsFactors = FALSE
 )
+
 
 ```
 
