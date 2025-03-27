@@ -1,9 +1,9 @@
 ---
 title: "PROYECTO"
 output:
-  word_document: default
   html_document:
     df_print: paged
+  word_document: default
   pdf_document: default
 author: ["Rubén Tormo Piles", "Mihai Cristian Mihalache Farcas", "Jorge Acín Zurita", "Robert Torres Mingarro"]
 ---
@@ -36,7 +36,7 @@ library(rmarkdown)
 
 # CARGA DE LA BASE DE DATOS Y ELIMINACIÓN DE DUPLICADOS
 
-Primero, empezaremos cargando la base de datos de idealista 2018 y eliminando los valores duplicados que aparecen en esta, quedándonos con la vivienda de menor precio en el caso de que tengan el ASSETID repetido.
+Primero, empezaremos cargando la base de datos de *idealista 2018* y eliminando los valores duplicados que aparecen en esta, quedándonos con la vivienda de menor precio en el caso de que tengan el **ASSETID** repetido.
 
 
 ```{r idealista, echo=TRUE}
@@ -52,13 +52,21 @@ duplicados <- Valencia_Sale %>% group_by(ASSETID) %>% filter(n() > 1) %>% ungrou
 duplicados_buenos = duplicados %>% group_by(ASSETID) %>% filter(PRICE == min(PRICE)) %>% slice_head(n = 1) %>% ungroup() # de los duplicados, nos quedamos los de menor precio
 Valencia_Sale <- anti_join(Valencia_Sale, duplicados, by = c("ASSETID", "PRICE")) # eliminamos los duplicados de la base de datos
 Valencia_Sale <- rbind(Valencia_Sale, duplicados_buenos) # añadimos los duplicados buenos que nos queremos quedar
+
+
+# Guradamos esto para la limpieza
+summary_df <- as.data.frame(summary(Valencia_Sale)) 
 ```
+### Base ya cargada de IDEALISTA 2018 sin duplicados
+`r Valencia_Sale`
+
+***
 
 # AED / Limpieza y Filtrado de la base
 
-Realizamos un summary de las variables para observar valores anómalos o posibles variables que debamos eliminar:
+Realizamos un `summary()` de las variables para observar valores anómalos o posibles variables que debamos eliminar:
 
- - Eliminamos CONSTRUCTIONYEAR ya que contiene muchos valores faltantes y atípicos. Además no es una variable importante ya que CADCONSTRUCTIONYEAR realiza la misma función y de forma más correcta.
+ - Eliminamos **CONSTRUCTIONYEAR** ya que contiene muchos valores faltantes y atípicos. Además no es una variable importante ya que **CADCONSTRUCTIONYEAR** realiza la misma función y de forma más correcta.
  
  - En esta última variable vemos dos valores anómalos que son 1591 y 1671 (unas fechas demasiado antiguas), que podemos eliminar sin problema.
  
@@ -68,13 +76,13 @@ Realizamos un summary de las variables para observar valores anómalos o posible
  
  - Hemos identificado una vivienda con 8 habitaciones y 12 baños, valor que consideramos anómalo por lo que eliminamos la fila.
  
- - Eliminamos también la variable PARKINGSPACEPRICE dado que no nos aporta información relevante y contiene muchos datos anómalos (precios de 1€).
+ - Eliminamos también la variable **PARKINGSPACEPRICE** dado que no nos aporta información relevante y contiene muchos datos anómalos (precios de 1€).
  
  - Eliminamos la variable FLATLOCATIONID ya que cuenta con más de 4000 datos faltantes, un número considerable, y no es una variable muy relevante para el análisis.
 
 
-Por otra parte, hemos comparado si el FLOORCLEAN (nº de piso) concuerda con el nº de piso máx. registrado en el catastro.
-Se han encontrado 1028 pisos con un FLOORCLEAN > CADMAXBUILDINGFLOOR, no obstante, después de habernos informado sobre el tema, hemos llegado a las siguientes posibilidades:
+Por otra parte, hemos comparado si el **FLOORCLEAN** (nº de piso) concuerda con el nº de piso máx. registrado en el catastro.
+Se han encontrado 1028 pisos con un **FLOORCLEAN** > **CADMAXBUILDINGFLOOR**, no obstante, después de habernos informado sobre el tema, hemos llegado a las siguientes posibilidades:
 
  - **La posible existencia de entreplantas o plantas técnicas:** En algunos edificios, hay plantas intermedias (como mezzanines, plantas técnicas o plantas de instalaciones) que no se cuentan en la numeración habitual pero sí en el Catastro.
 
@@ -129,7 +137,10 @@ descVal <- data.frame(
   "tipo" = c(rep("categorical", 2), rep("numerical", 36)), 
   stringsAsFactors = FALSE
 )
+
 ```
+
+
 
 ```{r PCA, echo=TRUE}
 ```
