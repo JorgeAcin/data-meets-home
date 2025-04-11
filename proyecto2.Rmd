@@ -13,16 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library("tinytex")
 library(sf)
 library(dplyr)
-library(readxl)
 library(rmarkdown)
 library(ggplot2)
-```
-
-```{r API, eval=FALSE, include=FALSE}
-# Leer un archivo Excel (.xlsx o .xls)
-# datos <- read_excel("propiedades_valencia.xlsx")
-# Ver las primeras filas
-# View(datos)
 ```
 
 
@@ -60,6 +52,8 @@ Valencia_Sale
 
 Realizamos un `summary()` de las variables para observar valores anómalos o posibles variables que debamos eliminar:
 
+ - Cabe resaltar que solamente encontramos faltantes en la v.a: **CONSTRUCTIONYEAR**, **FLOORCLEAN** y **FLATLOCATIONID **
+
  - Eliminamos **CONSTRUCTIONYEAR** ya que contiene muchos valores faltantes y atípicos. Además no es una variable importante ya que **CADCONSTRUCTIONYEAR** realiza la misma función y de forma más correcta.
  
  - En esta última variable vemos dos valores anómalos que son 1591 y 1671 (unas fechas demasiado antiguas), que podemos eliminar sin problema.
@@ -95,7 +89,9 @@ Por lo tanto dejaremos estas viviendas anunciadas en la base de datos.
 
 Continuamos con pisos que no son estudios y tienen 0 habitaciones (contamos con 40). No los tendremos en cuenta en nuestro proyecto, ya que no nos aportan nada al proyecto y la mayoría son datos anómalos erróneos.
 
-- Separamos de la base de datos las viviendas con 0 habitaciones ya que estas son estudios según Idealista. Esto lo 
+- **Transformación**: El ratio RHabitacion_Baño (número de baños por habitación) es una métrica útil para analizar la distribución de espacios en una vivienda y compararla con otras propiedades en el mercado inmobiliario. Nos puede servir además para indicar la comodidad de la vivienda: 
+Un valor alto indica que hay más baños por habitación, lo que puede ser un signo de mayor comodidad y funcionalidad en la vivienda.
+     
 
 
 ```{r summary, echo=TRUE}
@@ -168,6 +164,7 @@ descVal <- data.frame(
   stringsAsFactors = FALSE
 )
 
+Valencia_Sale$RHabitacion_Banyo <- ifelse(Valencia_Sale$ROOMNUMBER == 0, 0, Valencia_Sale$BATHNUMBER / Valencia_Sale$ROOMNUMBER)
 
 ```
 
