@@ -151,7 +151,7 @@ datos <- datos %>% filter(is.na(floor) | floor != "st")
 datos[!is.na(datos$floor) & datos$floor == "ss", "floor"] <- "-0.5"
 datos[!is.na(datos$floor) & datos$floor == "bj", "floor"] <- "0"
 datos[!is.na(datos$floor) & datos$floor == "en", "floor"] <- "0.5"
-datos[!is.na(datos2$floor) & datos$floor == "-2", "floor"] <- "2"
+datos[!is.na(datos$floor) & datos$floor == "-2", "floor"] <- "2"
 datos$floor <- as.numeric(datos$floor)
 summary(datos$floor)
 ```
@@ -224,6 +224,7 @@ El análisis preliminar de las variables categóricas mediante tablas de frecuen
 Boxplot de la variable rooms(número de habitaciones)
 
 ```{r}
+library(ggplot2)
 ggplot(datos, aes(x = as.factor(1), y = rooms)) +
   geom_boxplot(fill = "lightblue", color = "darkblue", notch = TRUE) +
   coord_flip() +  # Lo hace horizontal
