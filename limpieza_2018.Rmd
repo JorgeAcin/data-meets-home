@@ -9,12 +9,27 @@ output: word_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r instalar, eval=FALSE, include=FALSE}
+install.packages('readxl')
+install.packages('dplyr')
+install.packages('sf')
+install.packages('rmarkdown')
+install.packages('knitr')
+install.packages('tinytex')
+install.packages('ggplot2')
+install.packages('readr')
+install.packages('geojsonsf')
+```
+
 ```{r cargar, include=FALSE}
-library("tinytex")
+library(tinytex)
 library(sf)
 library(dplyr)
+library(readxl)
 library(rmarkdown)
 library(ggplot2)
+library(readr)
+library(geojsonsf)
 ```
 
 
@@ -178,9 +193,61 @@ mediana_precios_2018 = median(Valencia_Sale$PRICE)
 
 summary(Valencia_Sale$PRICE)
 
-precio_medio_barrio_2018 = Valencia_Sale %>% group_by()
+
+# Creamos una nueva variable llamada SIZE, donde se clasificará cada vivienda en PEQUEÑA(20 - 70 m^2), MEDIANA(70 - 120 m^2) y GRANDE(+120 m^2) según los metros cuadrados en CONSTRUCTEDAREA. Convertimos también la variable a categórica
+Valencia_Sale <- Valencia_Sale %>%
+  mutate(SIZE = case_when(
+    CONSTRUCTEDAREA >= 20 & CONSTRUCTEDAREA <= 70 ~ "Pequeña",
+    CONSTRUCTEDAREA > 70 & CONSTRUCTEDAREA <= 120 ~ "Mediana",
+    CONSTRUCTEDAREA > 120 ~ "Grande"
+  ))  
+Valencia_Sale$SIZE <- factor(Valencia_Sale$SIZE, 
+                           levels = c("Pequeña", "Mediana", "Grande"),
+                           ordered = TRUE)
+
+# Ahora, calculamos la media y la mediana de precios por tamaño
+precios_por_SIZE = Valencia_Sale %>%
+  group_by(SIZE) %>%
+  summarise(
+    n = n(),  # cantidad de viviendas por categoría
+    promedio_precio = mean(PRICE, na.rm = TRUE),
+    mediana_precio = median(PRICE, na.rm = TRUE),
+    min_precio = min(PRICE, na.rm = TRUE),
+    max_precio = max(PRICE, na.rm = TRUE),
+    sd_precio = sd(PRICE, na.rm = TRUE)
+  )
+
+barrios = read_delim("barris.csv", delim = ";")
+barrios$geometry <- geojson_sf(barrios$geo_shape)$geometry
+barrios_sf <- st_as_sf(barrios, sf_column_name = "geometry", crs = 4326)
+valencia_sf <- st_as_sf(Valencia_Sale, coords = c("LONGITUDE", "LATITUDE"), crs = 4326)
+Valencia_Sale <- st_join(valencia_sf, barrios_sf[, c("Nombre")])
+Valencia_Sale <- Valencia_Sale %>%
+  rename(BARRIO = 'Nombre')
+Valencia_Sale$BARRIO = as.factor(Valencia_Sale$BARRIO)
+
+
+media_por_barrio = Valencia_Sale %>%
+  group_by(BARRIO) %>%
+  summarise(
+    media_price = mean(PRICE, na.rm = TRUE),
+    cantidad_pisos = n()
+  )
 ```
 
 
 ```{r PCA, echo=TRUE}
+cor(Valencia_Sale$PRICE, Valencia_Sale$CONSTRUCTEDAREA, use = "complete.obs", method = "pearson")
+
+ggplot(Valencia_Sale, aes(x = SIZE, y = PRICE)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +
+  labs(title = "Relación entre metros cuadrados y precio",
+       x = "Metros cuadrados",
+       y = "Precio")
 ```
+Devuelve un valor entre -1 y 1:
+
+- Cerca de -1: correlación negativa fuerte
+- Cerca de 0: poca o ninguna correlación
+- Cerca de 1: correlación positiva fuerte
