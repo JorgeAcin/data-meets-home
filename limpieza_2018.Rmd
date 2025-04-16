@@ -168,6 +168,18 @@ Valencia_Sale$RHabitacion_Banyo <- ifelse(Valencia_Sale$ROOMNUMBER == 0, 0, Vale
 
 ```
 
+Una vez terminada la limpieza, realizaremos un AED más exhaustivo y preciso.
+
+```{r AED exhautivo, echo=TRUE}
+
+media_precios_2018 = mean(Valencia_Sale$PRICE)
+
+mediana_precios_2018 = median(Valencia_Sale$PRICE)
+
+summary(Valencia_Sale$PRICE)
+
+precio_medio_barrio_2018 = Valencia_Sale %>% group_by()
+```
 
 
 ```{r PCA, echo=TRUE}
