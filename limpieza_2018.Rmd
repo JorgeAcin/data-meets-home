@@ -9,17 +9,6 @@ output: word_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r instalar, eval=FALSE, include=FALSE}
-install.packages('readxl')
-install.packages('dplyr')
-install.packages('sf')
-install.packages('rmarkdown')
-install.packages('knitr')
-install.packages('tinytex')
-install.packages('ggplot2')
-install.packages('readr')
-install.packages('geojsonsf')
-```
 
 ```{r cargar, include=FALSE}
 library(tinytex)
@@ -30,6 +19,7 @@ library(rmarkdown)
 library(ggplot2)
 library(readr)
 library(geojsonsf)
+library(ggcorrplot)
 ```
 
 
@@ -246,8 +236,117 @@ ggplot(Valencia_Sale, aes(x = SIZE, y = PRICE)) +
        x = "Metros cuadrados",
        y = "Precio")
 ```
-Devuelve un valor entre -1 y 1:
+El análisis de correlación entre el área construida (CONSTRUCTEDAREA) y el precio de venta (PRICE) de la vivienda muestra un coeficiente de Pearson de 0.776. 
 
-- Cerca de -1: correlación negativa fuerte
-- Cerca de 0: poca o ninguna correlación
-- Cerca de 1: correlación positiva fuerte
+Esto podría indicar una fuerte relación positiva entre ambas variables. Esto sugiere que, en general, a mayor tamaño de construcción, mayor es el precio de venta de la vivienda.
+
+Por otra parte, observando el scatter plot, podemos reforzar nuestras conclusiones.
+
+- Tamaño pequeño: La mayoría de los precios son "bajos", solamente uno de ellos supera los 500.000 €.
+
+- Tamaño mediano: Los precios tienden a ser más altos que los de las viviendas pequeñas, pero siguen concentrados en precios relativamente accesibles, con algunos valores atípicos caros.
+
+- Tamaño grande: Se observa una gran dispersión de precios, incluyendo las viviendas más caras del conjunto, algunas llegando a superar la barrera de los 2 millones de euros.
+
+
+El gráfico confirma que existe una relación positiva entre el tamaño de la vivienda y su precio: las viviendas más grandes tienden a alcanzar precios más elevados. Sin embargo, se observa también una mayor variabilidad en el precio entre las viviendas grandes, lo que sugiere que además del tamaño, otros factores (como ubicación, nºde baños, ...) podrían llegar a influir sobre el precio de venta.
+
+
+
+Para agilizar el proceso y tener una variable global que pueda agrupar todos los servicios adicionales que presente la vivienda, crearemos una nueva variable llamada: TOTAL_SERVICIOS, que ponderará de manera justificada cada servicio, según su importancia y su búsqueda en un piso o casa de calidad.
+
+Esta nueva variable:
+
+-> Premia las buenas características (terraza, orientación, parking, piso nuevo, vistas externas…).
+
+-> Penaliza aspectos negativos (piso a reformar).
+
+-> Resume en una sola puntuación la "calidad percibida" de la vivienda.
+
+Score máximo que puede obtener un piso: 13.95 puntos
+
+Rango de scores entre -1 y 13.95 puntos
+
+```{r}
+Valencia_Sale$TOTAL_SERVICIOS <- (
+  1.2 * Valencia_Sale$HASTERRACE +                         # Terraza (nuevo peso 1.2)
+  1.0 * Valencia_Sale$HASLIFT +                            # Ascensor (nuevo peso 1.0)
+  0.75 * ifelse(Valencia_Sale$AMENITYID == 1, 1, 0) +      # Muebles incluidos (nuevo peso 0.75)
+  0.5 * Valencia_Sale$HASWARDROBE +                        # Armario empotrado
+  1.5 * Valencia_Sale$HASSWIMMINGPOOL +                    # Piscina
+  1.2 * Valencia_Sale$HASGARDEN +                          # Jardín
+  0.5 * Valencia_Sale$ISINTOPFLOOR +                       # Última planta
+  1.0 * Valencia_Sale$HASBOXROOM +                         # Trastero (nuevo peso 1.0)
+  1.0 * Valencia_Sale$HASPARKINGSPACE +                    # Parking
+  0.4 * Valencia_Sale$HASEASTORIENTATION +                 # Orientación Este (nuevo peso 0.4)
+  0.3 * Valencia_Sale$HASSOUTHORIENTATION +                # Orientación Sur (nuevo peso 0.3)
+  1.5 * Valencia_Sale$BUILTTYPEID_1 +                        # Obra nueva
+  1.0 * Valencia_Sale$BUILTTYPEID_3 +                        # Segunda mano buen estado
+  (-1.0) * Valencia_Sale$BUILTTYPEID_2                       # Piso para reformar
+)
+```
+
+Ahora queremos ver la correlación entre tener un score alto en los servicios adicionales, y el precio de la vivienda
+
+```{r}
+cor(Valencia_Sale$PRICE, Valencia_Sale$TOTAL_SERVICIOS, use = "complete.obs", method = "pearson")
+```
+ r = 0.3042 indica una correlación débil-moderada positiva.
+
+A mayor cantidad y calidad de servicios adicionales, el precio de la vivienda tiende a ser más alto, aunque no es el único factor importante que explica el precio.
+
+➔ Es lógico: otros factores como la ubicación, tamaño, año de construcción, estado, etc., también impactan muchísimo en el precio final.
+
+```{r}
+# Gráfico de dispersión
+ggplot(Valencia_Sale, aes(x = TOTAL_SERVICIOS, y = PRICE)) +
+  geom_point(alpha = 0.5) +  # puntos con algo de transparencia
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +  # línea de regresión
+  labs(
+    title = "Relación entre TOTAL_SERVICIOS y Precio de la Vivienda",
+    x = "Puntuación de Servicios Adicionales (TOTAL_SERVICIOS)",
+    y = "Precio de Venta (€)"
+  ) +
+  theme_minimal()
+```
+
+
+
+
+Esto de abajo es un intento, para ver la correlación del precio con cada una de las variables.
+
+```{r correlacion_general, message=FALSE, warning=FALSE}
+
+# Seleccionar solo variables numéricas y quitar posibles factores
+numeric_data <- Valencia_Sale[, sapply(Valencia_Sale, is.numeric)]
+
+# Verificar que PRICE esté incluido
+if (!"PRICE" %in% names(numeric_data)) {
+  numeric_data$PRICE <- as.numeric(Valencia_Sale$PRICE)
+}
+
+# Calcular todas las correlaciones
+cor_matrix <- cor(numeric_data, use = "complete.obs", method = "pearson")
+
+# Extraer solo la fila/columna de PRICE
+correlations_with_price <- cor_matrix["PRICE", ]
+
+# Ordenar de mayor a menor
+correlations_with_price <- sort(correlations_with_price, decreasing = TRUE)
+
+# Mostrar los resultados
+print(correlations_with_price)
+```
+```{r}
+
+# Graficar la matriz de correlaciones
+ggcorrplot(cor_matrix,
+           method = "square",    # Cuadrados
+           type = "lower",       # Solo la mitad inferior
+           lab = FALSE,          # Sin números dentro
+           colors = c("red", "white", "blue"), # Rojo-negativo, Blanco-cero, Azul-positivo
+           title = "Matriz de Correlaciones - Valencia Sale",
+           ggtheme = theme_minimal(),
+           tl.cex = 7)            # Tamaño del texto de las variables (más pequeño aún)
+
+```
