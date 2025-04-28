@@ -20,6 +20,8 @@ library(ggplot2)
 library(readr)
 library(geojsonsf)
 library(ggcorrplot)
+library(broom)
+library(MASS)
 ```
 
 
@@ -291,11 +293,14 @@ Ahora queremos ver la correlación entre tener un score alto en los servicios ad
 ```{r}
 cor(Valencia_Sale$PRICE, Valencia_Sale$TOTAL_SERVICIOS, use = "complete.obs", method = "pearson")
 ```
- r = 0.3042 indica una correlación débil-moderada positiva.
+ r = 0.30422 indica una correlación débil-moderada positiva.
 
 A mayor cantidad y calidad de servicios adicionales, el precio de la vivienda tiende a ser más alto, aunque no es el único factor importante que explica el precio.
 
 ➔ Es lógico: otros factores como la ubicación, tamaño, año de construcción, estado, etc., también impactan muchísimo en el precio final.
+
+Con r ≈ 0.30, lo que podríamos esperar ver en el gráfico es una tendencia ascendente suave, pero con bastante dispersión.
+(No será una línea muy ajustada, porque otros muchos factores también influyen en el precio).
 
 ```{r}
 # Gráfico de dispersión
@@ -309,6 +314,191 @@ ggplot(Valencia_Sale, aes(x = TOTAL_SERVICIOS, y = PRICE)) +
   ) +
   theme_minimal()
 ```
+Se observa una leve tendencia ascendente: los pisos con más servicios suelen tener precios algo mayores. No obstante, hay una gran dispersión en los precios. Encontramos pisos baratos y pisos caros para cualquier puntuación de servicios adicionales.
+
+Observamos outliers (de precios muy elevados), que contribuyen a crear más dispersión.
+
+Podemos concluir con que, el precio está claramente influido también por otras variables importantes no capturadas únicamente por el score de servicios.
+
+➔ El TOTAL_SERVICIOS es un buen predictor parcial, pero sería mejor incluirlo junto con otros factores en un modelo multivariable.
+
+
+
+Para poder saber si existe una relación estadísticamente significativa entre el número y calidad de servicios y el precio, realizaremos una regresión lineal simple, y su debido resumen estadístico.
+
+
+```{r resumen_regresion_price_totalservicios, message=FALSE, warning=FALSE}
+# Modelo de regresión lineal simple
+modelo <- lm(PRICE ~ TOTAL_SERVICIOS, data = Valencia_Sale)
+
+# Mostrar resumen estadístico
+summary(modelo)
+
+```
+Observando el resumen estadístico podemos apreciar diferentes aspectos:
+
+-> Intercepto: 107,983 €. Este es el precio medio esperado cuando el TOTAL_SERVICIOS es 0 (un piso sin servicios adicionales)
+
+-> La Pendiente de TOTAL_SERVICIOS es de 31,254.8 €. Esto se traduce en que, cada punto adicional en TOTAL_SERVICIOS aumenta el precio en promedio unos 31,255 €. Es decir: vivienda con más servicios adicionales → precio más alto, en media.
+
+Ambos coeficientes (Intercepto y TOTAL_SERVICIOS) tienen p-valor < 2e-16 (extremadamente bajo).
+Esto significa que la relación entre TOTAL_SERVICIOS y PRICE es altamente significativa.
+
+Si nos fijamos en el R² (coeficiente de determinación): TOTAL_SERVICIOS explica alrededor del 9,3% de la variabilidad del precio.
+No es un porcentaje muy elevado (el precio depende de más factores como tamaño, ubicación, antigüedad...), pero confirma que los servicios sí influyen.
+
+Por último, encontramos un error estándar residual de 165,800 €.
+La dispersión de los precios reales frente a los precios predichos es alta, como podríamos haber esperado por la naturaleza del mercado.
+
+
+
+
+```{r modelo_regresion_ampliado, message=FALSE, warning=FALSE}
+
+# Variables a excluir
+variables_excluir <- c(
+  "ASSETID", "UNITPRICE", "PERIOD",
+  "LATITUDE", "LONGITUDE",
+  # Variables usadas en servicios adicionales:
+  "HASTERRACE", "HASLIFT", "HASAIRCONDITIONING", "HASWARDROBE", "HASSWIMMINGPOOL",
+  "HASGARDEN", "ISINTOPFLOOR", "HASBOXROOM", "HASPARKINGSPACE",
+  "HASEASTORIENTATION", "HASSOUTHORIENTATION", "HASNORTHORIENTATION", "HASWESTORIENTATION",  "FLATLOCATIONID",
+  "AMENITYID", "BUILTTYPEID_1", "BUILTTYPEID_2", "BUILTTYPEID_3", "Precio_Categoria" 
+)
+
+# Seleccionar solo las variables permitidas
+variables_modelo <- setdiff(names(Valencia_Sale), variables_excluir)
+variables_modelo <- variables_modelo[variables_modelo != "PRICE"]  # Sacamos también PRICE para no repetir
+
+# Construir fórmula dinámica
+formula_modelo <- as.formula(
+  paste("PRICE ~", paste(variables_modelo, collapse = " + "))
+)
+
+# Ajustar el modelo
+modelo_ampliado <- lm(formula_modelo, data = Valencia_Sale)
+
+# Resumen del modelo
+summary(modelo_ampliado)
+
+```
+R² múltiple	0.7271. Valor muy alto: el modelo explica el 72.7% de la variabilidad del precio
+R² ajustado	0.7269.	✅ (R² ajustado ≈ R² múltiple): modelo no sobreajustado
+
+
+```{r importancia_variables_ampliado, message=FALSE, warning=FALSE}
+# Extraer coeficientes del modelo
+coeficientes_ampliado <- tidy(modelo_ampliado)
+
+# Filtrar intercepto y ordenar por magnitud del efecto
+coeficientes_ampliado <- coeficientes_ampliado %>%
+  filter(term != "(Intercept)") %>%
+  arrange(desc(abs(estimate))) %>%
+  head(20)  # Mostrar las variables más importantes
+
+# Gráfico
+ggplot(coeficientes_ampliado, aes(x = reorder(term, estimate), y = estimate, fill = estimate > 0)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_fill_manual(values = c("red", "blue")) +
+  labs(title = "Top Variables más Influyentes en el Precio",
+       x = "Variable",
+       y = "Coeficiente Estimado") +
+  theme_minimal()
+
+```
+
+
+
+```{r diagnostico_residuos_ampliado, message=FALSE, warning=FALSE}
+# Graficar los 4 plots clásicos de diagnóstico
+par(mfrow = c(2, 2))
+plot(modelo_ampliado)
+par(mfrow = c(1, 1))
+```
+Esto nos permite evaluar:
+
+Linealidad
+
+Homocedasticidad
+
+Normalidad de residuos
+
+Outliers y leverage
+
+
+
+
+
+```{r modelo_stepwise, message=FALSE, warning=FALSE}
+# Aplicar Stepwise automático
+modelo_stepwise <- stepAIC(modelo_ampliado, direction = "both", trace = TRUE)
+
+# Mostrar resumen del modelo optimizado
+summary(modelo_stepwise)
+```
+
+```{r grafico_prediccion_real, message=FALSE, warning=FALSE}
+
+# Predicciones usando solo datos completos
+predicciones_stepwise <- predict(modelo_stepwise)
+
+# Datos completos usados en el modelo
+precio_real <- modelo_stepwise$model$PRICE
+
+# Gráfico comparativo
+ggplot(data.frame(Real = precio_real, Predicho = predicciones_stepwise), aes(x = Real, y = Predicho)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(color = "blue", linetype = "dashed") +
+  labs(title = "Precio Real vs Precio Predicho (modelo stepwise)",
+       x = "Precio Real (€)",
+       y = "Precio Predicho (€)") +
+  theme_minimal()
+```
+
+```{r error_modelo_stepwise, message=FALSE, warning=FALSE}
+# Cálculo de RMSE y MAE
+residuos_stepwise <- Valencia_Sale$PRICE - predicciones_stepwise
+
+RMSE_stepwise <- sqrt(mean(residuos_stepwise^2, na.rm = TRUE))
+MAE_stepwise <- mean(abs(residuos_stepwise), na.rm = TRUE)
+
+cat("RMSE del modelo stepwise:", round(RMSE_stepwise, 2), "\n")
+cat("MAE del modelo stepwise:", round(MAE_stepwise, 2), "\n")
+
+```
+
+```{r variables_finales_stepwise, message=FALSE, warning=FALSE}
+# Variables finales seleccionadas
+variables_finales <- names(coef(modelo_stepwise))[-1]  # Quitar el intercepto
+print(variables_finales)
+
+```
+
+```{r ranking_importancia_stepwise, message=FALSE, warning=FALSE}
+
+# Extraer coeficientes del modelo stepwise
+coef_stepwise <- tidy(modelo_stepwise)
+
+# Filtrar intercepto
+coef_stepwise <- coef_stepwise %>%
+  filter(term != "(Intercept)") %>%
+  mutate(Importancia = abs(estimate)) %>%
+  arrange(desc(Importancia))
+
+# Gráfico de barras
+ggplot(coef_stepwise, aes(x = reorder(term, Importancia), y = Importancia, fill = estimate > 0)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_fill_manual(values = c("red", "blue")) +
+  labs(title = "Ranking de Importancia de Variables (Modelo Stepwise)",
+       x = "Variable",
+       y = "Importancia (|Coeficiente|)") +
+  theme_minimal()
+
+
+```
+
 
 
 
