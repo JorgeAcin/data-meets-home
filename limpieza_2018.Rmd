@@ -209,7 +209,7 @@ precios_por_SIZE = Valencia_Sale %>%
     sd_precio = sd(PRICE, na.rm = TRUE)
   )
 
-barrios = read_delim("barris.csv", delim = ";")
+barrios = read_delim("barris.csv", delim = ";", show_col_types = FALSE)
 barrios$geometry <- geojson_sf(barrios$geo_shape)$geometry
 barrios_sf <- st_as_sf(barrios, sf_column_name = "geometry", crs = 4326)
 valencia_sf <- st_as_sf(Valencia_Sale, coords = c("LONGITUDE", "LATITUDE"), crs = 4326)
@@ -228,7 +228,7 @@ media_por_barrio = Valencia_Sale %>%
 ```
 
 
-```{r PCA, echo=TRUE}
+```{r , echo=TRUE}
 cor(Valencia_Sale$PRICE, Valencia_Sale$CONSTRUCTEDAREA, use = "complete.obs", method = "pearson")
 
 ggplot(Valencia_Sale, aes(x = SIZE, y = PRICE)) +
@@ -363,7 +363,7 @@ variables_excluir <- c(
   "HASTERRACE", "HASLIFT", "HASAIRCONDITIONING", "HASWARDROBE", "HASSWIMMINGPOOL",
   "HASGARDEN", "ISINTOPFLOOR", "HASBOXROOM", "HASPARKINGSPACE",
   "HASEASTORIENTATION", "HASSOUTHORIENTATION", "HASNORTHORIENTATION", "HASWESTORIENTATION",  "FLATLOCATIONID",
-  "AMENITYID", "BUILTTYPEID_1", "BUILTTYPEID_2", "BUILTTYPEID_3", "Precio_Categoria" 
+  "AMENITYID", "BUILTTYPEID_1", "BUILTTYPEID_2", "BUILTTYPEID_3", "Precio_Categoria", "BARRIO", "geometry"
 )
 
 # Seleccionar solo las variables permitidas
@@ -501,6 +501,141 @@ ggplot(coef_stepwise, aes(x = reorder(term, Importancia), y = Importancia, fill 
 
 
 
+```{r score_real_con_builttyped, message=FALSE, warning=FALSE}
+# Extraer todos los coeficientes del modelo
+coefs <- coef(modelo_stepwise)
+
+nombres_servicios <- grep("HAS|IS|PARKING|AMENITY|WARDROBE|DOORMAN|BOXROOM|STUDIO|GARDEN|POOL|TERRACE|AIRCONDITIONING|BUILTTYPEID", 
+                          names(coefs), value = TRUE)
+
+#Calcular el score real basado en los coeficientes
+Valencia_Sale$SERVICIOS_SCORE_REAL <- rowSums(
+  sapply(nombres_servicios, function(var) {
+    if (var %in% names(Valencia_Sale)) {
+      return(coefs[var] * Valencia_Sale[[var]])
+    } else {
+      return(rep(0, nrow(Valencia_Sale)))
+    }
+  })
+)
+
+# Normalizar entre 0 y 10
+min_score <- min(Valencia_Sale$SERVICIOS_SCORE_REAL, na.rm = TRUE)
+max_score <- max(Valencia_Sale$SERVICIOS_SCORE_REAL, na.rm = TRUE)
+
+Valencia_Sale$SERVICIOS_SCORE_REAL_NORM <- 10 * (Valencia_Sale$SERVICIOS_SCORE_REAL - min_score) / (max_score - min_score)
+
+summary(Valencia_Sale$SERVICIOS_SCORE_REAL_NORM)
+
+cor(Valencia_Sale$PRICE, Valencia_Sale$SERVICIOS_SCORE_REAL_NORM, use = "complete.obs", method = "pearson")
+
+# Gráfico de dispersión
+ggplot(Valencia_Sale, aes(x = SERVICIOS_SCORE_REAL_NORM, y = PRICE)) +
+  geom_point(alpha = 0.5) +  # puntos con algo de transparencia
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +  # línea de regresión
+  labs(
+    title = "Relación entre SERVICIOS_SCORE_REAL_NORM y Precio de la Vivienda",
+    x = "Puntuación de Servicios Adicionales (SERVICIOS_SCORE_REAL_NORM)",
+    y = "Precio de Venta (€)"
+  ) +
+  theme_minimal()
+```
+
+
+```{r}
+modelo_nuevo <- lm(PRICE ~ HASTERRACE + HASLIFT + AMENITYID + HASWARDROBE + HASSWIMMINGPOOL +
+               HASGARDEN + ISINTOPFLOOR + HASBOXROOM + HASPARKINGSPACE +
+               HASEASTORIENTATION + HASSOUTHORIENTATION + 
+               BUILTTYPEID_1 + BUILTTYPEID_2 + BUILTTYPEID_3,
+             data = Valencia_Sale)
+
+summary(modelo_nuevo)
+
+```
+Construir un índice TOTAL_SERVICIOS que refleje el valor añadido de ciertos atributos de una vivienda al precio de venta. Para ello, se han utilizado pesos derivados de un modelo estadístico que estima la influencia real de cada atributo.
+
+Se ha aplicado un modelo de regresión lineal múltiple
+Este modelo estima cuánto incrementa o reduce el valor de la vivienda cada una de estas características, mientras se mantienen constantes las demás.
+
+De las variables introducidas, se eliminaron aquellas que no resultaron significativas estadísticamente (valor p > 0.05). Esto significa que su relación con el precio no puede demostrarse con suficiente confianza a partir de los datos:
+
+- HASEASTORIENTATION	0.414	No tiene una relación significativa con el precio.
+- BUILTTYPEID_1	0.15	Aunque positiva, su efecto no es estadísticamente sólido.
+- BUILTTYPEID_3	NA	Es la categoría de referencia en la codificación dummy, y por tanto no se incluye explícitamente.
+
+Se han conservado las variables que sí son estadísticamente significativas (p ≤ 0.05). Estas son las que realmente afectan al precio de forma demostrada.
+
+Se ha tomado el coeficiente estimado de cada variable en el modelo como medida de su importancia. Cuanto más alto el coeficiente (positivo o negativo), mayor es su impacto en el precio.
+
+Normalización:
+Para construir un índice proporcional y comparable entre variables, se normalizó cada coeficiente dividiéndolo por el mayor (el de HASLIFT, 80,511 €). Así se obtuvo una ponderación relativa entre 0 y 1.
+
+Ejemplo:
+Ponderación(HASTERRACE) = 49962 / 80511 ≈ 0.62
+
+Se incluyó un coeficiente negativo en el caso de AMENITYID, ya que en los datos, tener muebles (valor 1) parece reducir ligeramente el precio. Esto puede deberse a que se asocia a pisos más antiguos o de menor nivel.
+
+
+```{r}
+Valencia_Sale$TOTAL_SERVICIOS <- (
+  0.62 * Valencia_Sale$HASTERRACE +
+  1.00 * Valencia_Sale$HASLIFT +
+  -0.14 * ifelse(Valencia_Sale$AMENITYID == 1, 1, 0) +
+  0.23 * Valencia_Sale$HASWARDROBE +
+  0.22 * Valencia_Sale$HASSWIMMINGPOOL +
+  0.14 * Valencia_Sale$HASGARDEN +
+  0.61 * Valencia_Sale$ISINTOPFLOOR +
+  0.32 * Valencia_Sale$HASBOXROOM +
+  0.92 * Valencia_Sale$HASPARKINGSPACE +
+  0.07 * Valencia_Sale$HASSOUTHORIENTATION +
+  0.08 * Valencia_Sale$BUILTTYPEID_2
+)
+
+
+# Paso 2: Función para escalar entre 0 y 10
+escalar_entre_0_y_10 <- function(x) {
+  if (length(unique(x)) == 1) {
+    return(rep(5, length(x)))  # Si todos los valores son iguales, usa el valor medio
+  }
+  return((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)) * 10)
+}
+
+# Paso 3: Aplicar la función al índice
+Valencia_Sale$TOTAL_SERVICIOS_ESCALADO <- escalar_entre_0_y_10(Valencia_Sale$TOTAL_SERVICIOS)
+```
+
+```{r}
+plot(Valencia_Sale$TOTAL_SERVICIOS_ESCALADO, Valencia_Sale$PRICE,
+     main = "Relación entre TOTAL_SERVICIOS_ESCALADO y PRICE",
+     xlab = "TOTAL_SERVICIOS_ESCALADO",
+     ylab = "PRICE",
+     pch = 20, col = "blue")
+abline(lm(PRICE ~ TOTAL_SERVICIOS_ESCALADO, data = Valencia_Sale), col = "red", lwd = 2)
+
+```
+
+
+
+
+
+```{r}
+library(randomForest)
+
+# Asegúrate de que las variables son numéricas o factor donde corresponde
+modelo_rf <- randomForest(PRICE ~ HASTERRACE + HASLIFT + AMENITYID + HASWARDROBE + HASSWIMMINGPOOL +
+                            HASGARDEN + ISINTOPFLOOR + HASBOXROOM + HASPARKINGSPACE +
+                            HASEASTORIENTATION + HASSOUTHORIENTATION + 
+                            BUILTTYPEID_1 + BUILTTYPEID_2 + BUILTTYPEID_3,
+                          data = Valencia_Sale,
+                          importance = TRUE)
+
+# Importancia de variables
+importance(modelo_rf)
+varImpPlot(modelo_rf)
+
+```
+
+
 
 
 Esto de abajo es un intento, para ver la correlación del precio con cada una de las variables.
@@ -540,3 +675,4 @@ ggcorrplot(cor_matrix,
            tl.cex = 7)            # Tamaño del texto de las variables (más pequeño aún)
 
 ```
+
