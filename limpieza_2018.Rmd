@@ -22,6 +22,13 @@ library(geojsonsf)
 library(ggcorrplot)
 library(broom)
 library(MASS)
+library(tidyr)
+library(knitr)
+library(cluster)
+library(FactoMineR)
+library(factoextra)
+library(NbClust)
+library(clValid)
 ```
 
 
@@ -225,7 +232,20 @@ media_por_barrio = Valencia_Sale %>%
     media_price = mean(PRICE, na.rm = TRUE),
     cantidad_pisos = n()
   )
+
 ```
+Comprobaremos si existen pisos que no han tenido un barrio asignado.
+
+```{r}
+sum(is.na(Valencia_Sale$BARRIO))   # ver el número de pisos faltantes, sin barrio asignado
+```
+Observamos como contamos con 27 pisos que no cuentan con un barrio asignado. Es un valor pequeño de datos con faltantes, por ello decidimos eliminarlos del dataframe.
+
+```{r}
+Valencia_Sale <- Valencia_Sale %>%
+  filter(!is.na(BARRIO))
+```
+
 
 
 ```{r , echo=TRUE}
@@ -252,105 +272,6 @@ Por otra parte, observando el scatter plot, podemos reforzar nuestras conclusion
 
 
 El gráfico confirma que existe una relación positiva entre el tamaño de la vivienda y su precio: las viviendas más grandes tienden a alcanzar precios más elevados. Sin embargo, se observa también una mayor variabilidad en el precio entre las viviendas grandes, lo que sugiere que además del tamaño, otros factores (como ubicación, nºde baños, ...) podrían llegar a influir sobre el precio de venta.
-
-
-
-Para agilizar el proceso y tener una variable global que pueda agrupar todos los servicios adicionales que presente la vivienda, crearemos una nueva variable llamada: TOTAL_SERVICIOS, que ponderará de manera justificada cada servicio, según su importancia y su búsqueda en un piso o casa de calidad.
-
-Esta nueva variable:
-
--> Premia las buenas características (terraza, orientación, parking, piso nuevo, vistas externas…).
-
--> Penaliza aspectos negativos (piso a reformar).
-
--> Resume en una sola puntuación la "calidad percibida" de la vivienda.
-
-Score máximo que puede obtener un piso: 13.95 puntos
-
-Rango de scores entre -1 y 13.95 puntos
-
-```{r}
-Valencia_Sale$TOTAL_SERVICIOS <- (
-  1.2 * Valencia_Sale$HASTERRACE +                         # Terraza (nuevo peso 1.2)
-  1.0 * Valencia_Sale$HASLIFT +                            # Ascensor (nuevo peso 1.0)
-  0.75 * ifelse(Valencia_Sale$AMENITYID == 1, 1, 0) +      # Muebles incluidos (nuevo peso 0.75)
-  0.5 * Valencia_Sale$HASWARDROBE +                        # Armario empotrado
-  1.5 * Valencia_Sale$HASSWIMMINGPOOL +                    # Piscina
-  1.2 * Valencia_Sale$HASGARDEN +                          # Jardín
-  0.5 * Valencia_Sale$ISINTOPFLOOR +                       # Última planta
-  1.0 * Valencia_Sale$HASBOXROOM +                         # Trastero (nuevo peso 1.0)
-  1.0 * Valencia_Sale$HASPARKINGSPACE +                    # Parking
-  0.4 * Valencia_Sale$HASEASTORIENTATION +                 # Orientación Este (nuevo peso 0.4)
-  0.3 * Valencia_Sale$HASSOUTHORIENTATION +                # Orientación Sur (nuevo peso 0.3)
-  1.5 * Valencia_Sale$BUILTTYPEID_1 +                        # Obra nueva
-  1.0 * Valencia_Sale$BUILTTYPEID_3 +                        # Segunda mano buen estado
-  (-1.0) * Valencia_Sale$BUILTTYPEID_2                       # Piso para reformar
-)
-```
-
-Ahora queremos ver la correlación entre tener un score alto en los servicios adicionales, y el precio de la vivienda
-
-```{r}
-cor(Valencia_Sale$PRICE, Valencia_Sale$TOTAL_SERVICIOS, use = "complete.obs", method = "pearson")
-```
- r = 0.30422 indica una correlación débil-moderada positiva.
-
-A mayor cantidad y calidad de servicios adicionales, el precio de la vivienda tiende a ser más alto, aunque no es el único factor importante que explica el precio.
-
-➔ Es lógico: otros factores como la ubicación, tamaño, año de construcción, estado, etc., también impactan muchísimo en el precio final.
-
-Con r ≈ 0.30, lo que podríamos esperar ver en el gráfico es una tendencia ascendente suave, pero con bastante dispersión.
-(No será una línea muy ajustada, porque otros muchos factores también influyen en el precio).
-
-```{r}
-# Gráfico de dispersión
-ggplot(Valencia_Sale, aes(x = TOTAL_SERVICIOS, y = PRICE)) +
-  geom_point(alpha = 0.5) +  # puntos con algo de transparencia
-  geom_smooth(method = "lm", se = TRUE, color = "blue") +  # línea de regresión
-  labs(
-    title = "Relación entre TOTAL_SERVICIOS y Precio de la Vivienda",
-    x = "Puntuación de Servicios Adicionales (TOTAL_SERVICIOS)",
-    y = "Precio de Venta (€)"
-  ) +
-  theme_minimal()
-```
-Se observa una leve tendencia ascendente: los pisos con más servicios suelen tener precios algo mayores. No obstante, hay una gran dispersión en los precios. Encontramos pisos baratos y pisos caros para cualquier puntuación de servicios adicionales.
-
-Observamos outliers (de precios muy elevados), que contribuyen a crear más dispersión.
-
-Podemos concluir con que, el precio está claramente influido también por otras variables importantes no capturadas únicamente por el score de servicios.
-
-➔ El TOTAL_SERVICIOS es un buen predictor parcial, pero sería mejor incluirlo junto con otros factores en un modelo multivariable.
-
-
-
-Para poder saber si existe una relación estadísticamente significativa entre el número y calidad de servicios y el precio, realizaremos una regresión lineal simple, y su debido resumen estadístico.
-
-
-```{r resumen_regresion_price_totalservicios, message=FALSE, warning=FALSE}
-# Modelo de regresión lineal simple
-modelo <- lm(PRICE ~ TOTAL_SERVICIOS, data = Valencia_Sale)
-
-# Mostrar resumen estadístico
-summary(modelo)
-
-```
-Observando el resumen estadístico podemos apreciar diferentes aspectos:
-
--> Intercepto: 107,983 €. Este es el precio medio esperado cuando el TOTAL_SERVICIOS es 0 (un piso sin servicios adicionales)
-
--> La Pendiente de TOTAL_SERVICIOS es de 31,254.8 €. Esto se traduce en que, cada punto adicional en TOTAL_SERVICIOS aumenta el precio en promedio unos 31,255 €. Es decir: vivienda con más servicios adicionales → precio más alto, en media.
-
-Ambos coeficientes (Intercepto y TOTAL_SERVICIOS) tienen p-valor < 2e-16 (extremadamente bajo).
-Esto significa que la relación entre TOTAL_SERVICIOS y PRICE es altamente significativa.
-
-Si nos fijamos en el R² (coeficiente de determinación): TOTAL_SERVICIOS explica alrededor del 9,3% de la variabilidad del precio.
-No es un porcentaje muy elevado (el precio depende de más factores como tamaño, ubicación, antigüedad...), pero confirma que los servicios sí influyen.
-
-Por último, encontramos un error estándar residual de 165,800 €.
-La dispersión de los precios reales frente a los precios predichos es alta, como podríamos haber esperado por la naturaleza del mercado.
-
-
 
 
 ```{r modelo_regresion_ampliado, message=FALSE, warning=FALSE}
@@ -425,121 +346,6 @@ Homocedasticidad
 Normalidad de residuos
 
 Outliers y leverage
-
-
-
-
-
-```{r modelo_stepwise, message=FALSE, warning=FALSE}
-# Aplicar Stepwise automático
-modelo_stepwise <- stepAIC(modelo_ampliado, direction = "both", trace = TRUE)
-
-# Mostrar resumen del modelo optimizado
-summary(modelo_stepwise)
-```
-
-```{r grafico_prediccion_real, message=FALSE, warning=FALSE}
-
-# Predicciones usando solo datos completos
-predicciones_stepwise <- predict(modelo_stepwise)
-
-# Datos completos usados en el modelo
-precio_real <- modelo_stepwise$model$PRICE
-
-# Gráfico comparativo
-ggplot(data.frame(Real = precio_real, Predicho = predicciones_stepwise), aes(x = Real, y = Predicho)) +
-  geom_point(alpha = 0.5) +
-  geom_abline(color = "blue", linetype = "dashed") +
-  labs(title = "Precio Real vs Precio Predicho (modelo stepwise)",
-       x = "Precio Real (€)",
-       y = "Precio Predicho (€)") +
-  theme_minimal()
-```
-
-```{r error_modelo_stepwise, message=FALSE, warning=FALSE}
-# Cálculo de RMSE y MAE
-residuos_stepwise <- Valencia_Sale$PRICE - predicciones_stepwise
-
-RMSE_stepwise <- sqrt(mean(residuos_stepwise^2, na.rm = TRUE))
-MAE_stepwise <- mean(abs(residuos_stepwise), na.rm = TRUE)
-
-cat("RMSE del modelo stepwise:", round(RMSE_stepwise, 2), "\n")
-cat("MAE del modelo stepwise:", round(MAE_stepwise, 2), "\n")
-
-```
-
-```{r variables_finales_stepwise, message=FALSE, warning=FALSE}
-# Variables finales seleccionadas
-variables_finales <- names(coef(modelo_stepwise))[-1]  # Quitar el intercepto
-print(variables_finales)
-
-```
-
-```{r ranking_importancia_stepwise, message=FALSE, warning=FALSE}
-
-# Extraer coeficientes del modelo stepwise
-coef_stepwise <- tidy(modelo_stepwise)
-
-# Filtrar intercepto
-coef_stepwise <- coef_stepwise %>%
-  filter(term != "(Intercept)") %>%
-  mutate(Importancia = abs(estimate)) %>%
-  arrange(desc(Importancia))
-
-# Gráfico de barras
-ggplot(coef_stepwise, aes(x = reorder(term, Importancia), y = Importancia, fill = estimate > 0)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +
-  scale_fill_manual(values = c("red", "blue")) +
-  labs(title = "Ranking de Importancia de Variables (Modelo Stepwise)",
-       x = "Variable",
-       y = "Importancia (|Coeficiente|)") +
-  theme_minimal()
-
-
-```
-
-
-
-```{r score_real_con_builttyped, message=FALSE, warning=FALSE}
-# Extraer todos los coeficientes del modelo
-coefs <- coef(modelo_stepwise)
-
-nombres_servicios <- grep("HAS|IS|PARKING|AMENITY|WARDROBE|DOORMAN|BOXROOM|STUDIO|GARDEN|POOL|TERRACE|AIRCONDITIONING|BUILTTYPEID", 
-                          names(coefs), value = TRUE)
-
-#Calcular el score real basado en los coeficientes
-Valencia_Sale$SERVICIOS_SCORE_REAL <- rowSums(
-  sapply(nombres_servicios, function(var) {
-    if (var %in% names(Valencia_Sale)) {
-      return(coefs[var] * Valencia_Sale[[var]])
-    } else {
-      return(rep(0, nrow(Valencia_Sale)))
-    }
-  })
-)
-
-# Normalizar entre 0 y 10
-min_score <- min(Valencia_Sale$SERVICIOS_SCORE_REAL, na.rm = TRUE)
-max_score <- max(Valencia_Sale$SERVICIOS_SCORE_REAL, na.rm = TRUE)
-
-Valencia_Sale$SERVICIOS_SCORE_REAL_NORM <- 10 * (Valencia_Sale$SERVICIOS_SCORE_REAL - min_score) / (max_score - min_score)
-
-summary(Valencia_Sale$SERVICIOS_SCORE_REAL_NORM)
-
-cor(Valencia_Sale$PRICE, Valencia_Sale$SERVICIOS_SCORE_REAL_NORM, use = "complete.obs", method = "pearson")
-
-# Gráfico de dispersión
-ggplot(Valencia_Sale, aes(x = SERVICIOS_SCORE_REAL_NORM, y = PRICE)) +
-  geom_point(alpha = 0.5) +  # puntos con algo de transparencia
-  geom_smooth(method = "lm", se = TRUE, color = "blue") +  # línea de regresión
-  labs(
-    title = "Relación entre SERVICIOS_SCORE_REAL_NORM y Precio de la Vivienda",
-    x = "Puntuación de Servicios Adicionales (SERVICIOS_SCORE_REAL_NORM)",
-    y = "Precio de Venta (€)"
-  ) +
-  theme_minimal()
-```
 
 
 ```{r}
@@ -676,3 +482,787 @@ ggcorrplot(cor_matrix,
 
 ```
 
+Para poder estudiar las variables que influyen sobre cada piso dependiendo del barrio en el que se encuentre, deberemos de seguir diversos pasos que nos llevarán a poder conseguirlo.
+
+Primeramente, agruparemos los barrios en distritos -> En Valencia hay más de 80 barrios, pero solo 19 distritos. Usar distritos reduce la complejidad y mejora la visualización y comunicación de resultados.
+
+Además, los distritos son divisiones oficiales del ayuntamiento de Valencia, utilizadas en censos, estadísticas urbanas, presupuestos municipales, etc. Seguir esta estructura permite que nuestros análisis sean comparables con fuentes oficiales.
+
+```{r}
+Valencia_Sale$BARRIO <- as.character(Valencia_Sale$BARRIO)
+
+# barrios_unicos <- unique(Valencia_Sale$BARRIO) para poder saber todos los barrios que tenemos
+
+# los distritos los sacamos directamente de la web de Idealista
+distritos <- c(
+  "Extramurs", "Ciutat Vella", "L'Eixample", "Benicalap", "Patraix", "Campanar",
+  "Quatre Carreres", "El Pla del Real", "Rascanya", "Benimaclet", "L'Olivereta", "Jesús",
+  "La Saïdia", "Camins al Grau", "Poblats Marítims", "Algirós", "La Patacona", "Alboraya Centro")
+
+
+# le asignamos a cada barrio su distrito correspondiente, basándonos en la división administrativa oficial de Valencia 
+
+barrio_distrito <- c(
+  # Ciutat Vella
+  "LA SEU" = "Ciutat Vella", "LA XEREA" = "Ciutat Vella", "EL CARME" = "Ciutat Vella",
+  "EL MERCAT" = "Ciutat Vella", "EL PILAR" = "Ciutat Vella", "SANT FRANCESC" = "Ciutat Vella",
+  
+  # L'Eixample
+  "RUSSAFA" = "L'Eixample", "LA GRAN VIA" = "L'Eixample", "EL PLA DEL REMEI" = "L'Eixample",
+  
+  # Extramurs
+  "EL BOTANIC" = "Extramurs", "LA ROQUETA" = "Extramurs", "LA PETXINA" = "Extramurs", "ARRANCAPINS" = "Extramurs",
+  
+  # Campanar
+  "CAMPANAR" = "Campanar", "SANT PAU" = "Campanar", "LES TENDETES" = "Campanar",
+  
+  # La Saïdia
+  "EL CALVARI" = "La Saïdia", "MARXALENES" = "La Saïdia", "MORVEDRE" = "La Saïdia", 
+  "TRINITAT" = "La Saïdia", "ELS ORRIOLS" = "La Saïdia", "TORMOS" = "La Saïdia",
+  
+  # El Pla del Real
+  "EXPOSICIO" = "El Pla del Real", "MESTALLA" = "El Pla del Real", 
+  "JAUME ROIG" = "El Pla del Real", "CIUTAT UNIVERSITARIA" = "El Pla del Real",
+  
+  # L'Olivereta
+  "NOU MOLES" = "L'Olivereta", "TRES FORQUES" = "L'Olivereta", "LA FONTSANTA" = "L'Olivereta",
+  "LA LLUM" = "L'Olivereta", "SOTERNES" = "L'Olivereta",
+  
+  # Patraix
+  "PATRAIX" = "Patraix", "SAFRANAR" = "Patraix", "SANT ISIDRE" = "Patraix",
+  "LA RAIOSA" = "Patraix", "L'HORT DE SENABRE" = "Patraix", "FAVARA" = "Patraix",
+  "FAITANAR" = "Patraix", "VARA DE QUART" = "Patraix",
+  
+  # Jesús
+  "LA CREU COBERTA" = "Jesús", "SANT MARCEL.LI" = "Jesús", "CAMI REAL" = "Jesús",
+  
+  # Quatre Carreres
+  "MONTOLIVET" = "Quatre Carreres", "NA ROVELLA" = "Quatre Carreres", "EN CORTS" = "Quatre Carreres",
+  "MALILLA" = "Quatre Carreres", "LA PUNTA" = "Quatre Carreres",
+  "CIUTAT DE LES ARTS I DE LES CIENCIES" = "Quatre Carreres", "LA FONTETA S.LLUIS" = "Quatre Carreres",
+  
+  # Poblats Marítims
+  "EL GRAU" = "Poblats Marítims", "AIORA" = "Poblats Marítims", "CABANYAL-CANYAMELAR" = "Poblats Marítims",
+  "LA MALVA-ROSA" = "Poblats Marítims", "BETERO" = "Poblats Marítims", "LA CREU DEL GRAU" = "Poblats Marítims",
+  "NATZARET" = "Poblats Marítims",
+  
+  # Camins al Grau
+  "CAMI FONDO" = "Camins al Grau", "PENYA-ROJA" = "Camins al Grau", "LA VEGA BAIXA" = "Camins al Grau",
+  
+  # Algirós
+  "L'AMISTAT" = "Algirós", "ALBORS" = "Algirós", "CIUTAT JARDI" = "Algirós",
+  "L'ILLA PERDUDA" = "Algirós", "LA CARRASCA" = "Algirós",
+  
+  # Benimaclet
+  "BENIMACLET" = "Benimaclet", "CAMI DE VERA" = "Benimaclet",
+  
+  # Rascanya
+  "SANT LLORENS" = "Rascanya", "TORREFIEL" = "Rascanya", "SANT ANTONI" = "Rascanya",
+  
+  # Benicalap
+  "BENICALAP" = "Benicalap", "CIUTAT FALLERA" = "Benicalap", "BENIFERRI" = "Benicalap",
+  "POBLE NOU" = "Benicalap",
+  
+  # La Patacona / Alboraya
+  "LA PATACONA" = "La Patacona",
+  "ALBORAIA CENTRO" = "Alboraya Centro"
+)
+
+
+Valencia_Sale <- Valencia_Sale %>%
+  mutate(DISTRITO = recode(BARRIO, !!!barrio_distrito))
+
+Valencia_Sale$DISTRITO <- as.character(Valencia_Sale$DISTRITO) # pasamos la columna a tipo texto
+
+sum(is.na(Valencia_Sale$DISTRITO))   # ver el número de pisos faltantes, sin distrito asignado
+```
+Hemos asignado a cada barrio su distrito correspondiente. Asimismo, hemos comprobado que no hay ningún piso que no tenga un distrito asignado (no hay valores faltantes).
+
+
+Posteriormente, para facilitar nuestro análisis crearemos una nueva variable RANGO_PRECIO, que clasifique las viviendas en 3 tipos, Barato-Medio-Caro.
+
+De esta forma nos será más fácil determinar que características presentan los pisos de cada distrito dependiendo del RANGO_PRECIO donde se encuentren.
+
+```{r}
+hist(Valencia_Sale$PRICE,
+     breaks = 30,                # Número de barras (puedes ajustar)
+     col = "skyblue",            # Color de las barras
+     border = "white",           # Color del borde de las barras
+     main = "Histograma de precios de viviendas en Valencia",
+     xlab = "Precio (€)",
+     ylab = "Frecuencia")
+
+
+summary(Valencia_Sale$PRICE)
+```
+Después de haber analizado minuciosamente el histograma y el resumen estadístico de la variable PRICE, hemos decidido dividir los rangos de precio de la siguiente forma:
+
+ - Barato: < 100.000 €
+ 
+Se ajusta aproximadamente al 1er cuartil (97.000 €). Es más, el histograma muestra una enorme acumulación de viviendas con precios por debajo de 100.000 €.
+
+Incluye las viviendas más accesibles del mercado.
+
+
+- Medio: 100.000 € – 300.000 €
+
+Aquí se concentra la mayor parte del mercado, y donde el volumen comienza a caer gradualmente a partir de los 300k€. Cubre el rango entre el 1er y algo más allá del 3er cuartil (228.000 €).
+
+Incluye la mediana (148.000 €) y la mayoría del stock disponible.
+
+Refleja el mercado “normal” o promedio.
+
+
+- Caro: > 300.000 €
+
+Representa pisos por encima del rango común.
+
+A partir de los 300.000 €, la frecuencia en el histograma cae en picado. Es un indicio claro de que estamos entrando en el segmento de lujo o alto standing.
+
+```{r}
+Valencia_Sale$RANGO_PRECIO <- cut(
+  Valencia_Sale$PRICE,
+  breaks = c(-Inf, 100000, 300000, Inf),
+  labels = c("Barato", "Medio", "Caro"),
+  right = TRUE
+)
+
+table(Valencia_Sale$RANGO_PRECIO)
+```
+
+Ulteriormente, vamos a resaltar en cada distrito las variables que más influyen sobre cada rango de precio.
+
+Para ello solo vamos a tener en cuenta variables que compartamos con el dataframe de 2025, para poder usar el posterior modelo de predicción para este también.
+
+Antes de empezar, crearemos la variable Precio_m2 que nos explica el precio por metro cuadrado de la vivienda.
+
+```{r}
+Valencia_Sale$Precio_m2 <- round(Valencia_Sale$PRICE / Valencia_Sale$CONSTRUCTEDAREA, 2)
+
+library(dplyr)
+library(tidyr)
+library(sf)           # por si aún no estaba cargado
+
+modelo_vars <- c(
+  "CONSTRUCTEDAREA","ROOMNUMBER","BATHNUMBER","HASLIFT",
+  "BUILTTYPEID_1","BUILTTYPEID_2","BUILTTYPEID_3",
+  "DISTANCE_TO_CITY_CENTER","DISTANCE_TO_METRO",
+  "Precio_m2","RHabitacion_Banyo"
+)
+
+# 1.  Quitar geometría
+Valencia_Sale_nogeo <- Valencia_Sale %>% st_drop_geometry()
+
+# 2.  Resumen por distrito-rango
+resumen <- Valencia_Sale_nogeo %>% 
+  group_by(DISTRITO, RANGO_PRECIO) %>% 
+  summarise(across(all_of(modelo_vars), mean, na.rm = TRUE),
+            .groups = "drop")
+
+# 3.  Pivotar: una fila por distrito
+resumen_distritos <- resumen %>% 
+  pivot_wider(
+    names_from  = RANGO_PRECIO,                 # Barato / Medio / Caro
+    values_from = all_of(modelo_vars),
+    names_glue  = "{.value}_{RANGO_PRECIO}",
+    values_fill = NA                            # <- NA si falta el rango
+  )
+
+print(resumen_distritos)
+
+
+```
+Hemos creado un data frame paralelo en el que contamos con todos los distritos. Las columnas de este son la media de las variables seleccionadas (coincidentes con 2025), divididas en distintos rangos de precio.
+
+Esto se realiza para evitar aplanar la base de datos y juntar todos los tipos de pisos, así podemos conservar las diferencias y variabilidad entre ellos.
+
+Por otra parte, nuestro siguiente paso será la realización del clustering, así conseguiremos fácilmente agrupar distritos con características similares.
+
+
+```{r clustering de distritos}
+library(dplyr)
+library(tidyr)
+library(cluster)
+library(factoextra)
+library(tibble)
+
+
+# 1) Ponemos DISTRITO como rownames y quitamos la columna
+datos_raw <- resumen_distritos %>%
+  column_to_rownames("DISTRITO")
+
+# 2) Seleccionamos sólo las columnas numéricas
+datos_num <- datos_raw %>% dplyr::select(where(is.numeric))
+
+# 3) Estandarizamos
+datos_Z <- scale(datos_num, center = TRUE, scale = TRUE)
+
+# 4) Distancias y heatmap
+dist_mat <- dist(datos_Z, method = "euclidean")
+factoextra::fviz_dist(dist_mat,
+                      show_labels = TRUE,
+                      lab_size    = 3)
+
+dist_mat_manh <- dist(datos_Z, method = "manhattan")
+factoextra::fviz_dist(dist_mat_manh,
+                      show_labels = TRUE,
+                      lab_size    = 3)
+
+```
+Gracias al mapa de distancias podemos intuir visualmente antes de realizar algún método de clustering como se agruparán los distritos.
+Varias "manchas" azul claro (distancia pequeña entre ellas) forman bloques compactos.
+Cada bloque indica un conjunto de distritos con perfiles muy parecidos en las variables medias que empleamos. Entre esos bloques predominan valores cálidos (> 10 – 12), prueba de que esos grupos están bien separados: distritos del bloque A son bastante distintos de los del bloque B.
+
+Existe una estructura de agrupamiento clara: los bloques azulados sugieren 3-4 clusters de distritos con características inmobiliarias semejantes.
+
+
+```{r}
+set.seed(100)
+
+n_obs   <- nrow(datos_Z)            # 17
+m_vec   <- c(5, 8, 10, 12)          # tamaños de muestra viables
+seeds   <- sample(1:1000, 10)       # 10 semillas
+hop_val <- numeric()
+
+for (m in m_vec) {
+  for (s in seeds) {
+    h <- get_clust_tendency(data  = datos_Z,
+                            n     = m,
+                            seed  = s,
+                            graph = FALSE)$hopkins_stat
+    hop_val <- c(hop_val, h)
+  }
+}
+
+summary(hop_val)
+```
+Observamos el valor del estadístico de Hopkins que supera por poco el 0,5 , y su valor maáximo llega a los 0,6640. Esto indica una débil o moderada tendencia al agrupamiento.
+
+No es un valor extremadamente alto con el que podamos afirmar de manera segura que se forman clústers muy bien definidos.
+
+((((((((No obstante, nos parece suficiente, y seguiremos con el clustering.)))))))
+
+Sin embargo, como contamos con pocos distritos(filas) en el dataframe, con 37 variables distintas y hemos apreciado antes que no hay clusters tan bien definidos, realizaremos un PCA como paso intermedio para eliminar el ruido que generan varias variables y conseguir un clustering más robusto y fiable.
+
+```{r}
+res.pca = PCA(datos_Z, scale.unit = TRUE, graph = FALSE, ncp = 10)
+eig.val <- get_eigenvalue(res.pca)
+VPmedio = 100 * (1/nrow(eig.val))
+fviz_eig(res.pca, addlabels = TRUE) +
+  geom_hline(yintercept=VPmedio, linetype=2, color="red")
+
+kable(eig.val[1:6,])
+
+```
+Antes de realizar el PCA hemos debido de usar la librería de missMDA para imputar los valores faltantes con los que contabamos en el barrio de Nazaret, debido a que no contábamos con pisos Caros.
+
+Viendo el Scree Plot y la varianza acumulada de las dimensiones hemos decidido elegir 5 componentes Principales, explicando el 75,16% de la varianza total. A partir de la sexta componente, el incremento es más plano y la ganancia es marginal. Siguiendo esa línea, las primeras 5 componentes están por encima de esa media, la sexta está justo al límite.
+
+
+Como con los gráficos de variables es imposible sacar ninguna conclusión visualmente.
+Usaremos de forma complementaria unos gráfico auxiliares para las PC que deseemos representar, en nuestro caso las 5:
+```{r}
+fviz_contrib(res.pca, choice = "var", axes = 1)
+fviz_contrib(res.pca, choice = "var", axes = 2)
+fviz_contrib(res.pca, choice = "var", axes = 3)
+fviz_contrib(res.pca, choice = "var", axes = 4)
+fviz_contrib(res.pca, choice = "var", axes = 5)
+fviz_contrib(res.pca, choice = "var", axes = 6)
+```
+
+```{r}
+# Gráfico de scores
+fviz_pca_ind(res.pca, axes = c(1,2), geom = c("point", "text"), 
+            repel = TRUE, labelsize = 2)
+
+fviz_pca_ind(res.pca, axes = c(3,4), geom = c("point", "text"), 
+            repel = TRUE, labelsize = 2)
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+K = 6
+res.pca = PCA(datos_Z, scale.unit = TRUE, graph = FALSE, ncp = K)
+
+# 1. Extraer las coordenadas de los distritos en las 5 primeras componentes
+coords_pca <- res.pca$ind$coord[, 1:K]
+
+# 2. Calcular matriz de distancias
+dist_mat_pca <- dist(coords_pca, method = "euclidean")
+
+
+
+set.seed(101)
+
+n_obs   <- nrow(coords_pca)         # 16 distritos
+m_vec   <- c(5, 8, 10, 12)          # tamaños viables de muestra (todos < 16)
+seeds   <- sample(1:1000, 10)       # 10 semillas aleatorias
+hop_val_nuevo <- numeric()
+
+for (m in m_vec) {
+  for (s in seeds) {
+    h <- get_clust_tendency(data  = coords_pca,
+                            n     = m,
+                            seed  = s,
+                            graph = FALSE)$hopkins_stat
+    hop_val_nuevo <- c(hop_val_nuevo, h)
+  }
+}
+
+summary(hop_val_nuevo)
+
+```
+
+# sin pca
+
+```{r}
+library(grid)
+library(gridExtra)
+p1 = fviz_nbclust(x = datos_Z, FUNcluster = hcut, method = "silhouette", 
+                  hc_method = "ward.D2", k.max = 10, verbose = FALSE, 
+                  hc_metric = "euclidean") + labs(title = "Num. optimo clusters")
+p2 = fviz_nbclust(x = datos_Z, FUNcluster = hcut, method = "wss", 
+                  hc_method = "ward.D2", k.max = 10, verbose = FALSE, 
+                  hc_metric = "euclidean") + labs(title = "Num. optimo clusters")
+grid.arrange(p1, p2, nrow = 1)
+```
+
+# con pca
+
+
+```{r}
+library(grid)
+library(gridExtra)
+p1 = fviz_nbclust(x = coords_pca, FUNcluster = hcut, method = "silhouette", 
+                  hc_method = "ward.D2", k.max = 10, verbose = FALSE, 
+                  hc_metric = "euclidean") + labs(title = "Num. optimo clusters")
+p2 = fviz_nbclust(x = coords_pca, FUNcluster = hcut, method = "wss", 
+                  hc_method = "ward.D2", k.max = 10, verbose = FALSE, 
+                  hc_metric = "euclidean") + labs(title = "Num. optimo clusters")
+grid.arrange(p1, p2, nrow = 1)
+```
+
+# clustering sin pca
+
+```{r}
+dist_mat <- dist(datos_Z, method = "euclidean")
+clust1 <- hclust(dist_mat, method="ward.D2")
+grupos1 <- cutree(clust1, k=3)
+table(grupos1)
+```
+
+# clustering con pca
+
+```{r}
+dist_mat <- dist(coords_pca, method = "euclidean")
+clust2 <- hclust(dist_mat, method="ward.D2")
+grupos2 <- cutree(clust2, k=6)
+table(grupos2)
+```
+
+```{r}
+fviz_dend(clust1, k = 3,
+          cex = 0.5, color_labels_by_k = TRUE,
+          rect = TRUE) # dibujar rectángulos
+```
+
+```{r}
+fviz_dend(clust2, k = 6,
+          cex = 0.5, color_labels_by_k = TRUE,
+          rect = TRUE) # dibujar rectángulos
+```
+
+
+
+```{r}
+p1 = fviz_nbclust(x = datos_Z, FUNcluster = kmeans, method = "silhouette", 
+             k.max = 10, verbose = FALSE) +
+  labs(title = "K-means")
+p2 = fviz_nbclust(x = datos_Z, FUNcluster = kmeans, method = "wss", 
+             k.max = 10, verbose = FALSE) +
+  labs(title = "K-means")
+grid.arrange(p1, p2, nrow = 1)
+```
+
+# con pca
+
+```{r}
+p1 = fviz_nbclust(x = coords_pca, FUNcluster = kmeans, method = "silhouette", 
+             k.max = 10, verbose = FALSE) +
+  labs(title = "K-means")
+p2 = fviz_nbclust(x = coords_pca, FUNcluster = kmeans, method = "wss", 
+             k.max = 10, verbose = FALSE) +
+  labs(title = "K-means")
+grid.arrange(p1, p2, nrow = 1)
+```
+
+```{r}
+library(NbClust)
+
+res.km <- NbClust(
+  data      = coords_pca,    # <- así sí lo reconoce
+  diss      = NULL,
+  distance  = "euclidean",
+  min.nc    = 2,
+  max.nc    = 8,
+  method    = "kmeans",
+  index     = "all"
+)
+```
+
+```{r}
+set.seed(111)
+clust3 <- kmeans(coords_pca, centers = 6, nstart = 20)
+table(clust3$cluster)
+```
+
+```{r}
+fviz_pca_ind(
+  res.pca,                              # tu objeto prcomp
+  axes        = c(1, 2),                # PC1 vs PC2
+  geom        = "point",                # sólo puntos
+  habillage   = factor(clust3$cluster), # colorea por cluster
+  palette     = "jco",                  # paleta de colores
+  addEllipses = TRUE,                   # dibuja elipses de confianza
+  ellipse.type= "convex",               # tipo de elipse
+  repel       = TRUE                    # evita solapamiento de etiquetas
+) +
+  ggtitle("PCA: distritos coloreados por cluster (k-means)") +
+  theme_minimal()
+
+
+fviz_pca_ind(
+  res.pca,                              # tu objeto prcomp
+  axes        = c(3, 4),                # PC1 vs PC2
+  geom        = "point",                # sólo puntos
+  habillage   = factor(clust3$cluster), # colorea por cluster
+  palette     = "jco",                  # paleta de colores
+  addEllipses = TRUE,                   # dibuja elipses de confianza
+  ellipse.type= "convex",               # tipo de elipse
+  repel       = TRUE                    # evita solapamiento de etiquetas
+) +
+  ggtitle("PCA: distritos coloreados por cluster (k-means)") +
+  theme_minimal()
+```
+
+Cluster 1 (azul, PC1 negativas)
+
+Comprende los distritos más céntricos y de precio alto:
+Ciutat Vella, L'Eixample, El Pla del Real y Extramurs.
+
+Están muy próximos entre sí en el espacio PCA, lo que indica que comparten características muy similares (precio m² elevado, corta distancia al centro/metro, ascensor habitual,…).
+
+La dispersión en PC2 es reducida: todos ellos tienen configuraciones de habitaciones/baños parecidas.
+
+Cluster 2 (amarillo, PC1 positivas)
+
+Agrupa al resto de distritos más periféricos o “de precio moderado‐bajo”:
+p. ej. Benicalap, Rascanya, Jesús, Patraix, Pobles del Nord, etc., incluyendo el muy singular Natzaret.
+
+En PC1 se separan claramente de los urbanos caros, señalando una menor presión de precio y mayor distancia.
+
+En PC2 muestran más variabilidad: algunos son más grandes (más habitaciones/baños), otros más pequeños.
+
+Conclusiones clave
+PC1 (33,5 %) capta sobre todo la tensión precio–proximidad: valores negativos → caro y céntrico; positivos → más barato y periférico.
+
+PC2 (15,5 %) refleja diferencias en volumen y comodidades (nº de habitaciones/baños).
+
+El k-means recupera dos segmentos muy intuitivos:
+
+“Premium central” (cluster 1)
+
+“Residencial/periférico” (cluster 2)
+
+La baja superposición de elipses en el gráfico sugiere que la partición es sólida: cada grupo es compacto y bien separado.
+
+Natzaret aparece como un outlier dentro del cluster 2 (PC1 y PC2 muy altos), lo que indica un comportamiento atípico incluso dentro de las zonas más “baratas” (quizá por tamaño o características excepcionales).
+
+Estos insights te permiten perfilar ofertas de producto o estrategia comercial bien diferenciadas para cada segmento de distrito.
+
+
+
+```{r}
+library(dplyr)   # lo ponemos arriba para que use las instrucciones de esta librería
+
+# 1) Data.frame con distrito ↔ cluster
+distr_cluster <- data.frame(
+  DISTRITO = rownames(coords_pca),
+  CLUSTER  = clust3$cluster
+)
+
+# 2) Lista de distritos por cluster
+split(distr_cluster$DISTRITO, distr_cluster$CLUSTER)
+```
+
+Dibujar mapa de valencia, por distritos y cada distritos pintado por el cluster correspondiente
+
+
+# no me lee los q tienen acento dieresi o tal, jesús, algirós y la saïdia.
+
+```{r}
+library(sf)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+
+# 1) Cargar GeoJSON bruto
+url_geo <- "https://valencia.opendatasoft.com/explore/dataset/districtes-distritos/download/?format=geojson&timezone=Europe/Madrid&lang=es"
+distritos_raw <- st_read(url_geo, quiet = TRUE)
+
+# 2) Agregar/“dissolver” para quedarnos con una sola geometría por distrito
+distritos_sf <- distritos_raw %>%
+  # uniforme nombres: trim + todo mayúsculas
+  mutate(nombre_u = str_to_upper(str_squish(nombre))) %>%
+  group_by(nombre_u) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") %>%
+  st_as_sf()
+
+# 3) Prepara tu tabla de clusters con llaves también en mayúsculas
+#    Asume que `coords_pca` y `clust3` ya están en tu entorno.
+distr_cluster <- tibble(
+  DISTRITO = rownames(coords_pca),
+  CLUSTER   = factor(clust3$cluster)
+) %>%
+  mutate(DISTRITO_u = str_to_upper(str_squish(DISTRITO)))
+
+# 4) Hacer el join usando las columnas _u
+distritos_map <- distritos_sf %>%
+  left_join(distr_cluster, by = c("nombre_u" = "DISTRITO_u"))
+
+# 5) (Opcional) Filtrar sólo el “centro” si quieres
+centro <- c("CIUTAT VELLA", "L'EIXAMPLE", "EL PLA DEL REAL", "EXTRAMURS")
+distritos_centro <- distritos_map %>%
+  filter(nombre_u %in% centro)
+
+# 6) Pintar con ggplot2
+ggplot(distritos_map) +
+  geom_sf(aes(fill = CLUSTER), color = "gray30") +
+  scale_fill_brewer(palette = "Set1", na.value = "lightgray") +
+  labs(
+    title    = "Valencia: distritos por cluster",
+    subtitle = "Clusters k-means sobre primeras dos PCs"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+library(sf)
+library(dplyr)
+library(stringi)
+
+# a) Cargo el GeoJSON
+url_geo <- "https://valencia.opendatasoft.com/explore/dataset/districtes-distritos/download/?format=geojson&timezone=Europe/Madrid&lang=es"
+distritos_raw <- st_read(url_geo, quiet = TRUE)
+
+# b) Normalizo el nombre para que no falle el join (quita tildes, mayúsculas, espacios extra)
+distritos_sf <- distritos_raw %>%
+  mutate(
+    NAME = nombre %>% 
+           stri_trans_general("Latin-ASCII") %>%  # quita acentos
+           toupper() %>%                          # a mayúsculas
+           str_squish()                           # elimina espacios sobrantes
+  ) %>%
+  # c) Uno las geometrías para quedarme con un único polígono por distrito
+  group_by(NAME) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") %>%
+  st_as_sf()
+
+```
+
+```{r}
+library(tibble)
+
+distr_cluster <- tibble(
+  DISTRITO = rownames(coords_pca),
+  CLUSTER   = factor(clust3$cluster)
+) %>%
+  mutate(
+    NAME = DISTRITO %>%
+           stri_trans_general("Latin-ASCII") %>%
+           toupper() %>%
+           str_squish()
+  )
+
+```
+
+```{r}
+setdiff(distr_cluster$NAME, distritos_sf$NAME)
+# y a la inversa
+setdiff(distritos_sf$NAME, distr_cluster$NAME)
+
+```
+
+```{r map_distritos_clusters, message=FALSE, warning=FALSE}
+# 1) Cargar librerías
+library(sf)
+library(dplyr)
+library(stringi)
+library(ggplot2)
+
+# 2) Leer GeoJSON de distritos municipales de Valencia
+url_geo <- "https://valencia.opendatasoft.com/explore/dataset/districtes-distritos/download/?format=geojson&timezone=Europe/Madrid&lang=es"
+distritos_raw <- st_read(url_geo, quiet = TRUE)
+
+# 3) Normalizar nombres y reagrupar polígonos de "Poblats Marítims"
+distritos_sf <- distritos_raw %>%
+  # a) nombre limpio en mayúsculas sin tildes/espacios
+  mutate(NAME = nombre %>%
+           stri_trans_general("Latin-ASCII") %>%
+           toupper() %>%
+           str_squish()) %>%
+  # b) reagrupar trozos de Poblats Marítims bajo un solo NAME
+  mutate(NAME = case_when(
+    NAME %in% c("POBLATS DE L’OEST","POBLATS DEL NORD","POBLATS DEL SUD") ~ "POBLATS MARITIMS",
+    TRUE ~ NAME
+  )) %>%
+  # c) fusionar geometrías
+  group_by(NAME) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") %>%
+  st_as_sf()
+
+# 4) Preparar tabla de clusters (supone coords_pca y clust3 ya definidos)
+distr_cluster <- tibble(
+  DISTRITO = rownames(coords_pca),
+  CLUSTER  = factor(clust3$cluster)
+) %>%
+  # a) reasignar Natzaret a Poblats Marítims
+  mutate(DISTRITO = if_else(str_to_upper(DISTRITO) == "NATZARET",
+                            "POBLATS MARITIMS", DISTRITO)) %>%
+  # b) crear llave limpia
+  mutate(NAME = DISTRITO %>%
+           stri_trans_general("Latin-ASCII") %>%
+           toupper() %>%
+           str_squish())
+
+# 5) Unir geometrías con clusters
+distr_map <- distritos_sf %>%
+  left_join(distr_cluster, by = "NAME")
+
+# 6) Filtrar solo distritos con cluster asignado
+distr_plot <- distr_map %>%
+  filter(!is.na(CLUSTER))
+
+# 7) Dibujar el mapa
+ggplot(distr_plot) +
+  geom_sf(aes(fill = CLUSTER), color = "white") +
+  scale_fill_brewer(palette = "Set1", na.value = "lightgray") +
+  labs(
+    title    = "Valencia: distritos coloreados por cluster",
+    subtitle = "Clusters k-means sobre las dos primeras PCs"
+  ) +
+  theme_minimal() +
+  coord_sf(
+    xlim   = c(-0.42, -0.24),
+    ylim   = c(39.40, 39.60),
+    expand = FALSE
+  )
+
+
+```
+
+```{r map_distritos_numerados, message=FALSE, warning=FALSE}
+# 1) Librerías
+library(sf)
+library(dplyr)
+library(stringi)
+library(ggplot2)
+library(ggrepel)
+library(gridExtra)
+
+# 2) Cargo y preparo el sf de distritos (igual que antes)
+url_geo <- "https://valencia.opendatasoft.com/explore/dataset/districtes-distritos/download/?format=geojson&timezone=Europe/Madrid&lang=es"
+distritos_raw <- st_read(url_geo, quiet = TRUE)
+
+distritos_sf <- distritos_raw %>%
+  mutate(
+    NAME = nombre %>%
+      stri_trans_general("Latin-ASCII") %>%
+      toupper() %>%
+      str_squish(),
+    NAME = case_when(
+      NAME %in% c("POBLATS DE L’OEST","POBLATS DEL NORD","POBLATS DEL SUD") ~ "POBLATS MARITIMS",
+      TRUE ~ NAME
+    )
+  ) %>%
+  group_by(NAME) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") %>%
+  st_as_sf()
+
+# 3) Tabla de clusters con la misma clave
+distr_cluster <- tibble(
+  DISTRITO = rownames(coords_pca),
+  CLUSTER  = factor(clust3$cluster)
+) %>%
+  mutate(
+    DISTRITO = if_else(toupper(DISTRITO) == "NATZARET","POBLATS MARITIMS",DISTRITO),
+    NAME     = DISTRITO %>%
+      stri_trans_general("Latin-ASCII") %>%
+      toupper() %>%
+      str_squish()
+  )
+
+# 4) Uno y filtro solo valores con cluster
+distr_map <- distritos_sf %>%
+  left_join(distr_cluster, by = "NAME") %>%
+  filter(!is.na(CLUSTER))
+
+# 5) Asigno un ID numérico a cada distrito (en orden alfabético)
+distr_map <- distr_map %>%
+  arrange(NAME) %>%
+  mutate(ID = row_number())
+
+# 6) Calculo los centroides para colocar los números
+centros <- st_centroid(distr_map)
+centros_xy <- cbind(
+  st_drop_geometry(distr_map %>% dplyr::select(NAME,ID)),
+  st_coordinates(centros)
+)
+
+# 7) El mapa con los números
+p_map <- ggplot(distr_map) +
+  geom_sf(fill = "lightblue", color = "white") +
+  geom_text_repel(
+    data    = centros_xy,
+    aes(X, Y, label = ID),
+    size    = 5,
+    color   = "black",
+    seed    = 42
+  ) +
+  labs(
+    title = "Valencia: distritos numerados",
+    subtitle = "Cada número corresponde a un distrito cuyo nombre figura en la leyenda"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# 8) La “leyenda” como tabla de referencia
+tabla_ids <- distr_map %>%
+  st_drop_geometry() %>%
+  dplyr::select(ID, NAME)
+
+p_legend <- tableGrob(
+  tabla_ids,
+  rows = NULL,
+  theme = ttheme_minimal(core = list(fg_params = list(hjust=0)))
+)
+
+# 9) Combino mapa y tabla lado a lado
+grid.arrange(
+  p_map, p_legend,
+  ncol   = 2,
+  widths = c(2, 1)
+)
+
+
+```
