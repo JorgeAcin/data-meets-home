@@ -274,213 +274,8 @@ Por otra parte, observando el scatter plot, podemos reforzar nuestras conclusion
 El gráfico confirma que existe una relación positiva entre el tamaño de la vivienda y su precio: las viviendas más grandes tienden a alcanzar precios más elevados. Sin embargo, se observa también una mayor variabilidad en el precio entre las viviendas grandes, lo que sugiere que además del tamaño, otros factores (como ubicación, nºde baños, ...) podrían llegar a influir sobre el precio de venta.
 
 
-```{r modelo_regresion_ampliado, message=FALSE, warning=FALSE}
-
-# Variables a excluir
-variables_excluir <- c(
-  "ASSETID", "UNITPRICE", "PERIOD",
-  "LATITUDE", "LONGITUDE",
-  # Variables usadas en servicios adicionales:
-  "HASTERRACE", "HASLIFT", "HASAIRCONDITIONING", "HASWARDROBE", "HASSWIMMINGPOOL",
-  "HASGARDEN", "ISINTOPFLOOR", "HASBOXROOM", "HASPARKINGSPACE",
-  "HASEASTORIENTATION", "HASSOUTHORIENTATION", "HASNORTHORIENTATION", "HASWESTORIENTATION",  "FLATLOCATIONID",
-  "AMENITYID", "BUILTTYPEID_1", "BUILTTYPEID_2", "BUILTTYPEID_3", "Precio_Categoria", "BARRIO", "geometry"
-)
-
-# Seleccionar solo las variables permitidas
-variables_modelo <- setdiff(names(Valencia_Sale), variables_excluir)
-variables_modelo <- variables_modelo[variables_modelo != "PRICE"]  # Sacamos también PRICE para no repetir
-
-# Construir fórmula dinámica
-formula_modelo <- as.formula(
-  paste("PRICE ~", paste(variables_modelo, collapse = " + "))
-)
-
-# Ajustar el modelo
-modelo_ampliado <- lm(formula_modelo, data = Valencia_Sale)
-
-# Resumen del modelo
-summary(modelo_ampliado)
-
-```
-R² múltiple	0.7271. Valor muy alto: el modelo explica el 72.7% de la variabilidad del precio
-R² ajustado	0.7269.	✅ (R² ajustado ≈ R² múltiple): modelo no sobreajustado
 
 
-```{r importancia_variables_ampliado, message=FALSE, warning=FALSE}
-# Extraer coeficientes del modelo
-coeficientes_ampliado <- tidy(modelo_ampliado)
-
-# Filtrar intercepto y ordenar por magnitud del efecto
-coeficientes_ampliado <- coeficientes_ampliado %>%
-  filter(term != "(Intercept)") %>%
-  arrange(desc(abs(estimate))) %>%
-  head(20)  # Mostrar las variables más importantes
-
-# Gráfico
-ggplot(coeficientes_ampliado, aes(x = reorder(term, estimate), y = estimate, fill = estimate > 0)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +
-  scale_fill_manual(values = c("red", "blue")) +
-  labs(title = "Top Variables más Influyentes en el Precio",
-       x = "Variable",
-       y = "Coeficiente Estimado") +
-  theme_minimal()
-
-```
-
-
-
-```{r diagnostico_residuos_ampliado, message=FALSE, warning=FALSE}
-# Graficar los 4 plots clásicos de diagnóstico
-par(mfrow = c(2, 2))
-plot(modelo_ampliado)
-par(mfrow = c(1, 1))
-```
-Esto nos permite evaluar:
-
-Linealidad
-
-Homocedasticidad
-
-Normalidad de residuos
-
-Outliers y leverage
-
-
-```{r}
-modelo_nuevo <- lm(PRICE ~ HASTERRACE + HASLIFT + AMENITYID + HASWARDROBE + HASSWIMMINGPOOL +
-               HASGARDEN + ISINTOPFLOOR + HASBOXROOM + HASPARKINGSPACE +
-               HASEASTORIENTATION + HASSOUTHORIENTATION + 
-               BUILTTYPEID_1 + BUILTTYPEID_2 + BUILTTYPEID_3,
-             data = Valencia_Sale)
-
-summary(modelo_nuevo)
-
-```
-Construir un índice TOTAL_SERVICIOS que refleje el valor añadido de ciertos atributos de una vivienda al precio de venta. Para ello, se han utilizado pesos derivados de un modelo estadístico que estima la influencia real de cada atributo.
-
-Se ha aplicado un modelo de regresión lineal múltiple
-Este modelo estima cuánto incrementa o reduce el valor de la vivienda cada una de estas características, mientras se mantienen constantes las demás.
-
-De las variables introducidas, se eliminaron aquellas que no resultaron significativas estadísticamente (valor p > 0.05). Esto significa que su relación con el precio no puede demostrarse con suficiente confianza a partir de los datos:
-
-- HASEASTORIENTATION	0.414	No tiene una relación significativa con el precio.
-- BUILTTYPEID_1	0.15	Aunque positiva, su efecto no es estadísticamente sólido.
-- BUILTTYPEID_3	NA	Es la categoría de referencia en la codificación dummy, y por tanto no se incluye explícitamente.
-
-Se han conservado las variables que sí son estadísticamente significativas (p ≤ 0.05). Estas son las que realmente afectan al precio de forma demostrada.
-
-Se ha tomado el coeficiente estimado de cada variable en el modelo como medida de su importancia. Cuanto más alto el coeficiente (positivo o negativo), mayor es su impacto en el precio.
-
-Normalización:
-Para construir un índice proporcional y comparable entre variables, se normalizó cada coeficiente dividiéndolo por el mayor (el de HASLIFT, 80,511 €). Así se obtuvo una ponderación relativa entre 0 y 1.
-
-Ejemplo:
-Ponderación(HASTERRACE) = 49962 / 80511 ≈ 0.62
-
-Se incluyó un coeficiente negativo en el caso de AMENITYID, ya que en los datos, tener muebles (valor 1) parece reducir ligeramente el precio. Esto puede deberse a que se asocia a pisos más antiguos o de menor nivel.
-
-
-```{r}
-Valencia_Sale$TOTAL_SERVICIOS <- (
-  0.62 * Valencia_Sale$HASTERRACE +
-  1.00 * Valencia_Sale$HASLIFT +
-  -0.14 * ifelse(Valencia_Sale$AMENITYID == 1, 1, 0) +
-  0.23 * Valencia_Sale$HASWARDROBE +
-  0.22 * Valencia_Sale$HASSWIMMINGPOOL +
-  0.14 * Valencia_Sale$HASGARDEN +
-  0.61 * Valencia_Sale$ISINTOPFLOOR +
-  0.32 * Valencia_Sale$HASBOXROOM +
-  0.92 * Valencia_Sale$HASPARKINGSPACE +
-  0.07 * Valencia_Sale$HASSOUTHORIENTATION +
-  0.08 * Valencia_Sale$BUILTTYPEID_2
-)
-
-
-# Paso 2: Función para escalar entre 0 y 10
-escalar_entre_0_y_10 <- function(x) {
-  if (length(unique(x)) == 1) {
-    return(rep(5, length(x)))  # Si todos los valores son iguales, usa el valor medio
-  }
-  return((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)) * 10)
-}
-
-# Paso 3: Aplicar la función al índice
-Valencia_Sale$TOTAL_SERVICIOS_ESCALADO <- escalar_entre_0_y_10(Valencia_Sale$TOTAL_SERVICIOS)
-```
-
-```{r}
-plot(Valencia_Sale$TOTAL_SERVICIOS_ESCALADO, Valencia_Sale$PRICE,
-     main = "Relación entre TOTAL_SERVICIOS_ESCALADO y PRICE",
-     xlab = "TOTAL_SERVICIOS_ESCALADO",
-     ylab = "PRICE",
-     pch = 20, col = "blue")
-abline(lm(PRICE ~ TOTAL_SERVICIOS_ESCALADO, data = Valencia_Sale), col = "red", lwd = 2)
-
-```
-
-
-
-
-
-```{r}
-library(randomForest)
-
-# Asegúrate de que las variables son numéricas o factor donde corresponde
-modelo_rf <- randomForest(PRICE ~ HASTERRACE + HASLIFT + AMENITYID + HASWARDROBE + HASSWIMMINGPOOL +
-                            HASGARDEN + ISINTOPFLOOR + HASBOXROOM + HASPARKINGSPACE +
-                            HASEASTORIENTATION + HASSOUTHORIENTATION + 
-                            BUILTTYPEID_1 + BUILTTYPEID_2 + BUILTTYPEID_3,
-                          data = Valencia_Sale,
-                          importance = TRUE)
-
-# Importancia de variables
-importance(modelo_rf)
-varImpPlot(modelo_rf)
-
-```
-
-
-
-
-Esto de abajo es un intento, para ver la correlación del precio con cada una de las variables.
-
-```{r correlacion_general, message=FALSE, warning=FALSE}
-
-# Seleccionar solo variables numéricas y quitar posibles factores
-numeric_data <- Valencia_Sale[, sapply(Valencia_Sale, is.numeric)]
-
-# Verificar que PRICE esté incluido
-if (!"PRICE" %in% names(numeric_data)) {
-  numeric_data$PRICE <- as.numeric(Valencia_Sale$PRICE)
-}
-
-# Calcular todas las correlaciones
-cor_matrix <- cor(numeric_data, use = "complete.obs", method = "pearson")
-
-# Extraer solo la fila/columna de PRICE
-correlations_with_price <- cor_matrix["PRICE", ]
-
-# Ordenar de mayor a menor
-correlations_with_price <- sort(correlations_with_price, decreasing = TRUE)
-
-# Mostrar los resultados
-print(correlations_with_price)
-```
-```{r}
-
-# Graficar la matriz de correlaciones
-ggcorrplot(cor_matrix,
-           method = "square",    # Cuadrados
-           type = "lower",       # Solo la mitad inferior
-           lab = FALSE,          # Sin números dentro
-           colors = c("red", "white", "blue"), # Rojo-negativo, Blanco-cero, Azul-positivo
-           title = "Matriz de Correlaciones - Valencia Sale",
-           ggtheme = theme_minimal(),
-           tl.cex = 7)            # Tamaño del texto de las variables (más pequeño aún)
-
-```
 
 Para poder estudiar las variables que influyen sobre cada piso dependiendo del barrio en el que se encuentre, deberemos de seguir diversos pasos que nos llevarán a poder conseguirlo.
 
@@ -644,35 +439,58 @@ library(tidyr)
 library(sf)           # por si aún no estaba cargado
 
 modelo_vars <- c(
-  "CONSTRUCTEDAREA","ROOMNUMBER","BATHNUMBER","HASLIFT",
-  "BUILTTYPEID_1","BUILTTYPEID_2","BUILTTYPEID_3",
+  "CONSTRUCTEDAREA","ROOMNUMBER","BATHNUMBER",
   "DISTANCE_TO_CITY_CENTER","DISTANCE_TO_METRO",
   "Precio_m2","RHabitacion_Banyo"
 )
 
-# 1.  Quitar geometría
-Valencia_Sale_nogeo <- Valencia_Sale %>% st_drop_geometry()
+vars_bin <- c( "HASLIFT","BUILTTYPEID_1","BUILTTYPEID_2","BUILTTYPEID_3")
 
-# 2.  Resumen por distrito-rango
-resumen <- Valencia_Sale_nogeo %>% 
-  group_by(DISTRITO, RANGO_PRECIO) %>% 
-  summarise(across(all_of(modelo_vars), mean, na.rm = TRUE),
-            .groups = "drop")
-
-# 3.  Pivotar: una fila por distrito
-resumen_distritos <- resumen %>% 
-  pivot_wider(
-    names_from  = RANGO_PRECIO,                 # Barato / Medio / Caro
-    values_from = all_of(modelo_vars),
-    names_glue  = "{.value}_{RANGO_PRECIO}",
-    values_fill = NA                            # <- NA si falta el rango
+resumen <- Valencia_Sale %>%
+  st_drop_geometry() %>%
+  mutate(Precio_m2 = round(PRICE / CONSTRUCTEDAREA, 2)) %>%
+  group_by(DISTRITO, RANGO_PRECIO) %>%
+  summarise(
+    # Continuas: media, min, max, sd
+    across(
+      all_of(modelo_vars),
+      .fns = list(
+        media = \(x) mean(x, na.rm = TRUE),
+        min   = \(x) min(x, na.rm = TRUE),
+        max   = \(x) max(x, na.rm = TRUE),
+        sd    = \(x) sd(x, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ),
+    # Binarias: solo media y sd
+    across(
+      all_of(vars_bin),
+      .fns = list(
+        media = \(x) mean(x, na.rm = TRUE),
+        sd    = \(x) sd(x, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ),
+    .groups = "drop"
   )
 
+resumen_distritos <- resumen %>%
+  pivot_wider(
+    id_cols     = DISTRITO,
+    names_from  = RANGO_PRECIO,
+    values_from = -c(DISTRITO, RANGO_PRECIO),
+    names_glue  = "{.value}_{RANGO_PRECIO}",
+    values_fill = NA
+  )
+
+
+# 5) Lo convertimos a data.frame para verlo completo
+resumen_distritos <- as.data.frame(resumen_distritos)
 print(resumen_distritos)
-
-
 ```
-Hemos creado un data frame paralelo en el que contamos con todos los distritos. Las columnas de este son la media de las variables seleccionadas (coincidentes con 2025), divididas en distintos rangos de precio.
+Hemos creado un data frame paralelo en el que contamos con todos los distritos. Las columnas de este son la media de las variables seleccionadas (coincidentes con 2025), divididas en distintos rangos de precio. Además, sacaremos también los valores mínimos y máximos de cada variable, así como su desviación típica.
+
+Por otra parte, de las variables que son binarias hemos decidido sacar solamente la media y desviación típica, así podremos apreciar la tendencia más habitual de los pisos en determinados distritos dependiendo de su rango de precio.
 
 Esto se realiza para evitar aplanar la base de datos y juntar todos los tipos de pisos, así podemos conservar las diferencias y variabilidad entre ellos.
 
@@ -696,6 +514,7 @@ datos_num <- datos_raw %>% dplyr::select(where(is.numeric))
 
 # 3) Estandarizamos
 datos_Z <- scale(datos_num, center = TRUE, scale = TRUE)
+datos_Z <- as.data.frame(datos_Z)
 
 # 4) Distancias y heatmap
 dist_mat <- dist(datos_Z, method = "euclidean")
@@ -719,7 +538,7 @@ Existe una estructura de agrupamiento clara: los bloques azulados sugieren 3-4 c
 ```{r}
 set.seed(100)
 
-n_obs   <- nrow(datos_Z)            # 17
+n_obs   <- nrow(datos_Z)            # 16
 m_vec   <- c(5, 8, 10, 12)          # tamaños de muestra viables
 seeds   <- sample(1:1000, 10)       # 10 semillas
 hop_val <- numeric()
@@ -730,13 +549,13 @@ for (m in m_vec) {
                             n     = m,
                             seed  = s,
                             graph = FALSE)$hopkins_stat
-    hop_val <- c(hop_val, h)
+    hop_val <- c(hop_val, as.numeric(h))
   }
 }
 
 summary(hop_val)
 ```
-Observamos el valor del estadístico de Hopkins que supera por poco el 0,5 , y su valor maáximo llega a los 0,6640. Esto indica una débil o moderada tendencia al agrupamiento.
+Observamos el valor del estadístico de Hopkins que supera por poco el 0,5 , y su valor maáximo llega a los 0,6395. Esto indica una débil o moderada tendencia al agrupamiento.
 
 No es un valor extremadamente alto con el que podamos afirmar de manera segura que se forman clústers muy bien definidos.
 
@@ -751,7 +570,7 @@ VPmedio = 100 * (1/nrow(eig.val))
 fviz_eig(res.pca, addlabels = TRUE) +
   geom_hline(yintercept=VPmedio, linetype=2, color="red")
 
-kable(eig.val[1:6,])
+kable(eig.val[1:10,])
 
 ```
 Antes de realizar el PCA hemos debido de usar la librería de missMDA para imputar los valores faltantes con los que contabamos en el barrio de Nazaret, debido a que no contábamos con pisos Caros.
@@ -856,7 +675,7 @@ grid.arrange(p1, p2, nrow = 1)
 ```{r}
 dist_mat <- dist(datos_Z, method = "euclidean")
 clust1 <- hclust(dist_mat, method="ward.D2")
-grupos1 <- cutree(clust1, k=3)
+grupos1 <- cutree(clust1, k=5)
 table(grupos1)
 ```
 
@@ -865,18 +684,18 @@ table(grupos1)
 ```{r}
 dist_mat <- dist(coords_pca, method = "euclidean")
 clust2 <- hclust(dist_mat, method="ward.D2")
-grupos2 <- cutree(clust2, k=6)
+grupos2 <- cutree(clust2, k=4)
 table(grupos2)
 ```
 
 ```{r}
-fviz_dend(clust1, k = 3,
+fviz_dend(clust1, k = 4,
           cex = 0.5, color_labels_by_k = TRUE,
           rect = TRUE) # dibujar rectángulos
 ```
 
 ```{r}
-fviz_dend(clust2, k = 6,
+fviz_dend(clust2, k = 4,
           cex = 0.5, color_labels_by_k = TRUE,
           rect = TRUE) # dibujar rectángulos
 ```
@@ -905,9 +724,24 @@ p2 = fviz_nbclust(x = coords_pca, FUNcluster = kmeans, method = "wss",
 grid.arrange(p1, p2, nrow = 1)
 ```
 
+
 ```{r}
 library(NbClust)
 
+res.km <- NbClust(
+  data      = datos_Z,    # <- así sí lo reconoce
+  diss      = NULL,
+  distance  = "euclidean",
+  min.nc    = 2,
+  max.nc    = 8,
+  method    = "kmeans",
+  index     = "all"
+)
+```
+
+
+
+```{r}
 res.km <- NbClust(
   data      = coords_pca,    # <- así sí lo reconoce
   diss      = NULL,
@@ -1266,3 +1100,4 @@ grid.arrange(
 
 
 ```
+
