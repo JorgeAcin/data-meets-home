@@ -462,17 +462,15 @@ resumen <- Valencia_Sale %>%
       ),
       .names = "{.col}_{.fn}"
     ),
-    # Binarias: solo media y sd
+    # Binarias: solo media (sin sd)
     across(
       all_of(vars_bin),
-      .fns = list(
-        media = \(x) mean(x, na.rm = TRUE),
-        sd    = \(x) sd(x, na.rm = TRUE)
-      ),
-      .names = "{.col}_{.fn}"
+      .fns   = ~mean(.x, na.rm = TRUE),
+      .names = "{.col}_media"
     ),
     .groups = "drop"
   )
+
 
 resumen_distritos <- resumen %>%
   pivot_wider(
@@ -641,7 +639,7 @@ summary(hop_val_nuevo)
 
 ```
 
-# sin pca
+# sin pca -> Método de Ward
 
 ```{r}
 library(grid)
@@ -684,23 +682,23 @@ table(grupos1)
 ```{r}
 dist_mat <- dist(coords_pca, method = "euclidean")
 clust2 <- hclust(dist_mat, method="ward.D2")
-grupos2 <- cutree(clust2, k=4)
+grupos2 <- cutree(clust2, k=5)
 table(grupos2)
 ```
 
 ```{r}
-fviz_dend(clust1, k = 4,
+fviz_dend(clust1, k = 5,
           cex = 0.5, color_labels_by_k = TRUE,
           rect = TRUE) # dibujar rectángulos
 ```
 
 ```{r}
-fviz_dend(clust2, k = 4,
+fviz_dend(clust2, k = 5,
           cex = 0.5, color_labels_by_k = TRUE,
           rect = TRUE) # dibujar rectángulos
 ```
 
-
+# sin pca -> K-Medias
 
 ```{r}
 p1 = fviz_nbclust(x = datos_Z, FUNcluster = kmeans, method = "silhouette", 
@@ -711,6 +709,9 @@ p2 = fviz_nbclust(x = datos_Z, FUNcluster = kmeans, method = "wss",
   labs(title = "K-means")
 grid.arrange(p1, p2, nrow = 1)
 ```
+
+A la vista de todos los métodos que estamos empleando, el número más razonable de clusters sería 5 o 6.
+
 
 # con pca
 
@@ -728,15 +729,11 @@ grid.arrange(p1, p2, nrow = 1)
 ```{r}
 library(NbClust)
 
-res.km <- NbClust(
-  data      = datos_Z,    # <- así sí lo reconoce
-  diss      = NULL,
-  distance  = "euclidean",
-  min.nc    = 2,
-  max.nc    = 8,
-  method    = "kmeans",
-  index     = "all"
-)
+res.km <- NbClust(data = datos_Z, distance = "euclidean",
+                  min.nc = 2, max.nc = 8, method = "kmeans",
+                  index = "silhouette")
+res.km$All.index   # todos los valores de índice para k = 2,…,8
+res.km$Best.nc
 ```
 
 
@@ -754,9 +751,16 @@ res.km <- NbClust(
 ```
 
 ```{r}
-set.seed(111)
-clust3 <- kmeans(coords_pca, centers = 6, nstart = 20)
+set.seed(112)
+clust3 <- kmeans(datos_Z, centers = 5, nstart = 20)
 table(clust3$cluster)
+```
+
+
+```{r}
+set.seed(111)
+clust_k_means_pca <- kmeans(coords_pca, centers = 5, nstart = 20)
+table(clust_k_means_pca$cluster)
 ```
 
 ```{r}
@@ -788,55 +792,367 @@ fviz_pca_ind(
   theme_minimal()
 ```
 
-Cluster 1 (azul, PC1 negativas)
+A la vista de los dos gráficos —el PCA con los 16 distritos y el mismo PCA coloreado por k-means (k = 5)— se aprecian cinco “perfiles” muy nítidos:
 
-Comprende los distritos más céntricos y de precio alto:
-Ciutat Vella, L'Eixample, El Pla del Real y Extramurs.
+-> Encontramos la zona del casco histórico y de edificación densa
 
-Están muy próximos entre sí en el espacio PCA, lo que indica que comparten características muy similares (precio m² elevado, corta distancia al centro/metro, ascensor habitual,…).
+Distritos: Ciutat Vella, L’Eixample, Extramurs y El Pla del Real.
 
-La dispersión en PC2 es reducida: todos ellos tienen configuraciones de habitaciones/baños parecidas.
+Encontramos unos scores muy negativos sobre la primera componente (poca superficie construida media en todos los rangos de precio) y PC2 cercana a 0.Son barrios más antiguos.
 
-Cluster 2 (amarillo, PC1 positivas)
+-> Barrios de alta superficie “económica”
 
-Agrupa al resto de distritos más periféricos o “de precio moderado‐bajo”:
-p. ej. Benicalap, Rascanya, Jesús, Patraix, Pobles del Nord, etc., incluyendo el muy singular Natzaret.
+Distritos: Jesús, Camins al Grau y Benimaclet.
 
-En PC1 se separan claramente de los urbanos caros, señalando una menor presión de precio y mayor distancia.
+PC1 negativa-media pero PC2 claramente negativa.
 
-En PC2 muestran más variabilidad: algunos son más grandes (más habitaciones/baños), otros más pequeños.
+zonas con mucha oferta de pisos más “baratos” pero de gran tamaño (bloques de los años 60–70), con menos presencia de producto caro.
 
-Conclusiones clave
-PC1 (33,5 %) capta sobre todo la tensión precio–proximidad: valores negativos → caro y céntrico; positivos → más barato y periférico.
+Áreas mixtas de densidad media
 
-PC2 (15,5 %) refleja diferencias en volumen y comodidades (nº de habitaciones/baños).
+Distritos: Algirós, L’Olivereta y Campanar.
 
-El k-means recupera dos segmentos muy intuitivos:
+PC1 ligeramente positiva y PC2 alrededor de cero a moderadamente negativa.
 
-“Premium central” (cluster 1)
+Interpretación: barrios de densidad media, con inventario tanto económico como de precio medio, superficies modestas en los tramos más altos.
 
-“Residencial/periférico” (cluster 2)
+Residencial popular de mediana-alta superficie
 
-La baja superposición de elipses en el gráfico sugiere que la partición es sólida: cada grupo es compacto y bien separado.
+Distritos: Patraix, La Saïdia y Rascanya.
 
-Natzaret aparece como un outlier dentro del cluster 2 (PC1 y PC2 muy altos), lo que indica un comportamiento atípico incluso dentro de las zonas más “baratas” (quizá por tamaño o características excepcionales).
+PC1 positiva-media y PC2 positiva-baja.
 
-Estos insights te permiten perfilar ofertas de producto o estrategia comercial bien diferenciadas para cada segmento de distrito.
+Interpretación: productos de precio medio con superficies mínimas algo elevadas: bloques construidos en la expansión de los 80–90 orientados a clase trabajadora.
+
+Zonas de nueva planta y altos estándares
+
+Distritos: Poblats Marítims, Benicalap y Quatre Carreres.
+
+PC1 claramente positiva y PC2 muy positiva.
+
+Interpretación: desarrollos recientes con demanda de vivienda “cara”, grandes superficies y calidades superiores.
 
 
+El clustering sobre el PCA refleja perfectamente la heterogeneidad de Valencia: desde el compacto casco histórico (cluster 1), pasando por los barrios de bloques grandes y baratos (cluster 2), hasta los nuevos desarrollos de alto standing (cluster 5), con otros dos perfiles intermedios (clusters 3 y 4).
+
+
+# k-medoides sin pca
+
+
+```{r}
+p1 = fviz_nbclust(x = datos_Z, FUNcluster = pam, method = "silhouette", 
+             k.max = 10, verbose = FALSE) +
+  labs(title = "Numero optimo de clusters")
+p2 = fviz_nbclust(x = datos_Z, FUNcluster = pam, method = "wss", 
+             k.max = 10, verbose = FALSE) +
+  labs(title = "Numero optimo de clusters")
+grid.arrange(p1, p2, nrow = 1)
+```
+
+Como en el resto de gráficas, con 2 clusters conseguimos el 'peak' del coeficiente de silhouette, no obstante hay bastante variabilidad intracluster.
+Nos conviene más aumentar el número de cluster y ganar unos clusters con menos variabilidad.
+
+Desde 3 hasta 8 clusters el coef. es relativamente plano, decidiremos quedarnos por ejemplo con 5 clusters.
+
+
+```{r}
+clust4 <- pam(datos_Z, k =5)
+table(clust4$clustering)
+```
+
+
+Decidiremos que tipo de clustering realizar, pero sobre los datos sin PCA, el PCA
+
+
+Vamos a comprobar que método de clustering agrupa de la mejor manera nuestros distritos y es el que usaremos finalmente:
+
+```{r}
+library(ggsci)
+
+# ward
+dist_mat <- dist(datos_Z, method = "euclidean")
+clust1 <- hclust(dist_mat, method="ward.D2")
+grupos1 <- cutree(clust1, k=5)
+
+# k-medias
+set.seed(114)
+clust3 <- kmeans(datos_Z, centers = 5, nstart = 20)
+
+# k-medoides
+clust4 <- pam(datos_Z, k =5)
+
+colores = pal_npg("nrc")(6)
+colores2 = pal_npg("nrc")(7)
+par(mfrow = c(1,3))
+plot(silhouette(grupos1, dist_mat), col=colores, border=NA, main = "WARD")
+plot(silhouette(clust3$cluster, dist_mat), col=colores, border=NA, main = "K-MEDIAS")
+plot(silhouette(clust4$clustering, dist_mat), col=colores2, border=NA, main = "K-MEDOIDES")
+```
+
+```{r}
+metodos = c("hierarchical","kmeans","pam")
+validacion = suppressMessages(clValid(datos_Z, nClust = 2:6, metric = "euclidean", 
+                      clMethods = metodos, 
+                      validation = c("internal", "stability"),
+                      method = "ward"))
+summary(validacion)
+```
+
+
+
+Elegimos el método de las k-means:
 
 ```{r}
 library(dplyr)   # lo ponemos arriba para que use las instrucciones de esta librería
 
-# 1) Data.frame con distrito ↔ cluster
 distr_cluster <- data.frame(
-  DISTRITO = rownames(coords_pca),
+  DISTRITO = rownames(datos_Z),
   CLUSTER  = clust3$cluster
 )
 
-# 2) Lista de distritos por cluster
-split(distr_cluster$DISTRITO, distr_cluster$CLUSTER)
+# 2. Mostrar lista de distritos agrupados por cluster
+clusters_lista <- split(distr_cluster$DISTRITO, distr_cluster$CLUSTER)
+
+# 3. Imprimir de forma legible
+for (i in sort(unique(distr_cluster$CLUSTER))) {
+  cat(paste0("\n📦 Cluster ", i, ":\n"))
+  print(clusters_lista[[as.character(i)]])
+}
 ```
+
+```{r}
+perfiles = aggregate(datos_Z, by = list("cluster" = clust3$cluster), mean)
+kable(perfiles)
+```
+
+
+```{r}
+matplot(t(perfiles[,-1]), type = "l", ylab = "medias", lty = 1, lwd = 2, 
+        col = rainbow(5), xlab = "", xaxt = "n")
+axis(side = 1, at = 1:ncol(datos_Z), labels = colnames(datos_Z), las = 2, cex.axis = 0.6)
+legend("topright", as.character(1:5), col = rainbow(5), lwd = 2, bty = "n")
+```
+✅ 1. Extraer las variables que más distinguen los clusters
+Como estás trabajando con valores escalados, una buena forma de detectar las variables más relevantes es calcular la varianza entre clusters para cada variable:
+
+La varianza mide la dispersión de los valores medios por cada cluster.
+
+-> Una varianza más elevada se traduce en mayores diferencias entre clusters, por lo que nos será más fácil explicar por qué se formaron.
+
+-> Una varianza baja, por otra parte, indicaría que todos los clusters son más o menos iguales en esa variable.
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+df_clusters <- data.frame(cluster = clust3$cluster, datos_raw)
+
+
+# Calculamos varianza entre clusters
+
+variabilidad <- df_clusters %>%
+  pivot_longer(-cluster, names_to = "variable", values_to = "valor") %>%
+  group_by(variable) %>%
+  summarise(varianza = var(valor)) %>%
+  arrange(desc(varianza))
+
+top_vars <- head(variabilidad, 96)
+print(top_vars)
+```
+
+Las primeras posiciones del ranking están dominadas por variables relacionadas con el PRECIO por m², estas son las variables más discriminantes.
+
+El precio por metro cuadrado, especialmente en viviendas caras, es con diferencia la variable que mejor separa los clusters. Por ello, podemos observar que la segmentación de clusters está fuertemente influenciada por el mercado alto.
+
+Asimismo, el precio por m² en rangos medio y barato contribuye, aunque en menor medida. Las diferencias de precio son estructurales entre grupos.
+
+A estas las siguen las Variables de superficie construida:
+
+CONSTRUCTEDAREA_max_Caro, CONSTRUCTEDAREA_media_Barato, CONSTRUCTEDAREA_sd_Caro, CONSTRUCTEDAREA_min_Caro, CONSTRUCTEDAREA_max_Medio...
+
+Los metros cuadrados con los que cuentan las viviendas (tanto su media como mínima y máxima) aparecen sistemáticamente entre las 30 variables más importantes.
+
+El tamaño de los inmuebles también separa los clusters, especialmente en los extremos del mercado (caro y barato). Además, la variabilidad del tamaño (desviación típica) también tiene su importancia sobre los clusters que agrupan zonas con viviendas más homogéneas frente a las más dispares.
+
+
+A partir de la fila 25 y hasta más de la mitad de filasm encontramos salteados los Número de baños y habitaciones, contando con variables como:
+
+BATHNUMBER_max_Caro, ROOMNUMBER_max_Caro, BATHNUMBER_sd_Caro, ROOMNUMBER_min_Caro, etc.
+
+El número de habitaciones y baños tiene importancia media-alta. Aunque no discriminan tanto como el precio y el tamaño, aportan información útil y relevante, especialmente en viviendas caras. 
+Seguramente porque existan zonas de lujo que cuenten con viviendas de alta gama, presentando estas un elevado número de baños/dormitorios.
+La variabilidad interna en el número de baños (desviación típica) también aparece, lo que sugiere heterogeneidad dentro de algunos clusters.
+
+ 
+Seguidamente, y de la misma forma que los núm. de habitaciones y baños, encontramos simúltaneamente la Distancia al centro y al metro.
+Contando con Variables como:
+
+DISTANCE_TO_CITY_CENTER_max_Barato, DISTANCE_TO_CITY_CENTER_media_Caro, etc.
+
+Las distancias al centro y al metro tienen un peso menor en la discriminación de clusters, aunque no es algo que debamos desestimar.
+
+Las variables de distancia aparecen más abajo en el ranking, lo que sugiere que la localización geográfica relativa no es el principal motor del clustering, al menos no directamente.
+
+No diferenciará en gran medida los clusters debido a que nos encontramos en el centro de valencia. Prácticamente todos los pisos contarán con una parada de metro a la que puedan llegar fácilmente y en poco tiempo a pie. De la misma forma, el centro de la ciudad tampoco deberá variar demasiado. Solamente variará entre los pisos que se encuentren explícitamente en el centro, y los que se encuentren en los distritos que lo rodean.
+
+
+Por último hablaremos del estado del piso (BUILTTYPEID), que cuente con ascensor y los ratios de habitaciones por baño.
+
+Estas se sitúan muy al final, con varianzas bajísimas (~10^-5 o incluso menores). Indicando que estos factores no están diferenciando realmente los clusters. Puede deberse a:
+
+Contamos con poca variabilidad entre distritos en estas variables (casi todos los pisos se encuentran en buen estado, tienen ascensor...)
+
+
+Nuestro análisis de varianza entre clusters demuestra con claridad que los clusters están definidos principalmente por el mercado inmobiliario:
+
+💰 Precio por m² es el mayor factor diferenciador.
+
+📏 Le sigue la superficie construida (y su dispersión).
+
+🚿 El número de habitaciones y baños también ayuda a diferenciar.
+
+📍 La localización (distancia al centro o al metro) tiene relevancia secundaria.
+
+🧱 Elementos como ascensor o el estado del piso tienen escasa capacidad de diferenciación.
+
+
+
+
+
+
+✅ 2. Ranking de importancia por cluster
+Si quieres saber qué variables distinguen más a cada cluster individualmente, se puede calcular cuánto se desvía cada cluster de la media general por variable (z-score absoluto).
+
+Este ranking_por_cluster nos mostrará un top-5 de variables más extremas por cluster, con su valor absoluto.
+
+```{r}
+df_clusters <- data.frame(cluster = clust3$cluster, datos_Z) # aquí sí que usamos los datos centrados y escalados
+
+ranking_por_cluster <- df_clusters %>%
+  pivot_longer(-cluster, names_to = "variable", values_to = "valor") %>%
+  mutate(valor_abs = abs(valor)) %>%
+  group_by(cluster) %>%
+  arrange(cluster, desc(valor_abs)) %>%
+  slice_head(n = 5)  # top 5 por cluster
+
+print(ranking_por_cluster)
+```
+
+🟥 Cluster 1 – Perfil de proximidad + mercado intermedio asequible
+
+🧠 Interpretación:
+Viviendas caras con muchos baños y buena relación baño-habitación.
+
+Viviendas medias con tamaño mínimo alto → incluso las más pequeñas son razonablemente grandes.
+
+Precio máximo en rango medio bajo → zona con mercado de gama media contenida, sin picos especulativos.
+
+🎯 Conclusión:
+Cluster 1 parece caracterizar zonas bien equipadas, con buena distribución y tamaño, especialmente en la gama media y cara, pero con precios moderados. Podría ser un perfil de barrios familiares consolidados, de clase media-alta funcional, más que zonas de lujo.
+
+🟨 Cluster 2 – Desviaciones en tamaño y distribución interna
+
+🧠 Interpretación:
+Viviendas baratas y medias alejadas del metro.
+
+En viviendas medias, los ratios habitación/baño son más altos → posible infra-dotación de servicios.
+
+En viviendas baratas, el tamaño máximo es bajo, lo cual sugiere homogeneidad hacia el pequeño tamaño.
+
+🎯 Conclusión:
+Cluster 2 representa zonas menos conectadas y con viviendas más pequeñas y menos equipadas, incluso en la gama media. Podría corresponder a barrios periféricos de clase media-baja o zonas tradicionales no reformadas, con poca accesibilidad y precios aún no tensionados.
+
+🟦 Cluster 3 – Perfil de viviendas variadas pero con superficie reducida
+
+🧠 Interpretación:
+Muy pocos baños y habitaciones en viviendas medias y baratas.
+
+Alta variabilidad interna en los caros (relación habitación/baño dispersa) y en superficies en media.
+
+Dificultad para identificar un tamaño "típico", posiblemente por alta heterogeneidad constructiva.
+
+🎯 Conclusión:
+Cluster 3 parece representar zonas con una mezcla de construcciones viejas, nuevas o reformadas, tamaño reducido y gran heterogeneidad. Podría corresponder a barrios céntricos antiguos o zonas gentrificadas parcialmente, donde coexisten diferentes perfiles de vivienda.
+
+🟪 Cluster 4 – Viviendas con superficies variables y precio elevado
+
+🧠 Interpretación:
+Alta dispersión de superficie y precio en viviendas caras → mercado inmobiliario muy heterogéneo.
+
+Pocas habitaciones medias en la gama cara → puede haber muchas viviendas pequeñas de lujo.
+
+El tipo de construcción más frecuente (BUILTYPED_1, probablemente edificio completo) predomina tanto en barato como en caro.
+
+🎯 Conclusión:
+Cluster 4 refleja zonas con presencia de mercado inmobiliario tensionado y de lujo, pero muy disperso en tamaño y precio. Indica un área en la que puede haber tanto pisos muy caros pequeños como viviendas grandes con precio medio, posiblemente zonas de inversión y especulación.
+
+
+🟩 Cluster 5 – Aislamiento relativo + fuerte protagonismo del metro
+
+🧠 Interpretación:
+Zonas donde el acceso al metro es muy desigual y generalmente alejado, en todos los rangos de precio.
+
+La media de ascensor en vivienda cara es muy baja, lo cual sugiere construcciones antiguas o de bajo nivel de servicios, incluso en el rango superior.
+
+🎯 Conclusión:
+Cluster 5 representa zonas con baja accesibilidad al transporte público y déficits en equipamiento moderno, incluso en viviendas de precio alto. Puede tratarse de zonas urbanas periféricas o consolidadas pero envejecidas, donde no ha llegado la renovación de infraestructuras.
+
+
+✅ Conclusión general
+Este análisis revela que los clusters están definidos por:
+
+Factores clave	Clusters destacados
+Precio por m²	Cluster 1 (bajo), Cluster 4 (disperso)
+Tamaño/Distribución	Cluster 2 y 3 (pocos baños, tamaño bajo)
+Equipamiento	Cluster 5 (sin ascensor, baja conectividad)
+Variabilidad interna	Cluster 3 y 4 (alta dispersión en caro)
+
+
+
+✅ 3. Gráficos más limpios para interpretación
+🎯 a) Heatmap de los 10 más importantes
+
+```{r}
+# Usamos las 10 variables más discriminantes
+top_var_names <- top_vars$variable
+
+df_top <- df_clusters %>%
+  dplyr::select(cluster, all_of(top_var_names)) %>%
+  pivot_longer(-cluster, names_to = "variable", values_to = "valor")
+
+ggplot(df_top, aes(x = variable, y = factor(cluster), fill = valor)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  labs(x = "Variable", y = "Cluster", title = "Heatmap de las 10 Variables Más Discriminantes") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+🎯 b) Gráfico de líneas sólo con las variables clave
+
+
+```{r}
+top_vars_wide <- df_clusters %>%
+  dplyr::select(cluster, all_of(top_var_names))
+
+matplot(t(top_vars_wide[,-1]), type = "l", lty = 1, col = 1:5,
+        xaxt = "n", ylab = "Valor estandarizado", main = "Perfil por Cluster (Top 10 variables)")
+axis(1, at = 1:length(top_var_names), labels = top_var_names, las = 2)
+legend("topright", legend = paste("Cluster", 1:5), col = 1:5, lty = 1)
+
+```
+
+🔚 ¿Qué necesito para hacerlo contigo?
+El dataframe con los datos estandarizados y el número de cluster asignado por fila. (Si lo tienes en una variable R, dime el nombre).
+
+O, si quieres, sube el CSV o pega los primeros 5–10 registros aquí.
+
+
+
+
+
+
 
 Dibujar mapa de valencia, por distritos y cada distritos pintado por el cluster correspondiente
 
@@ -1100,4 +1416,3 @@ grid.arrange(
 
 
 ```
-
