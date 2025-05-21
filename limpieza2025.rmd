@@ -33,7 +33,7 @@ datos = read_excel("propiedades_valencia_2025.xlsx")
 head(datos)
 ```
 ```{r}
-datos %>% filter(propertyCode == 106230584) %>% select(url)
+datos %>% filter(propertyCode == 106230584) %>% dplyr::select(url)
 ```
 ### Limpieza y exploración
 
@@ -69,7 +69,7 @@ datos <- datos %>%
             former_price = parsed_json$price$priceDropInfo$formerPrice %||% NA, 
             price_drop_value = parsed_json$price$priceDropInfo$priceDropValue %||% NA, 
             price_drop_percentage = parsed_json$price$priceDropInfo$priceDropPercentage %||% NA) %>% 
-            select(-parsed_json, -priceInfo_clean, -priceInfo)
+            dplyr::select(-parsed_json, -priceInfo_clean, -priceInfo)
 
 head(datos$detailedType)
 datos <- datos %>% 
@@ -82,7 +82,7 @@ datos <- datos %>%
     typology = parsed_json$typology %||% NA,
     subTypology = parsed_json$subTypology %||% NA
   ) %>% 
-  select(-parsed_json, -detailedType_clean, -detailedType)
+  dplyr::select(-parsed_json, -detailedType_clean, -detailedType)
 
 head(table(datos$suggestedTexts)) #Como es de tipo texto no la procesamos ya que no nos va a servir en el análisis exploratorio
 
@@ -118,7 +118,7 @@ extract_parking_info <- function(parking_info) {
 
 parking_info <- do.call(rbind, lapply(datos$parkingSpace, extract_parking_info))
 datos <- cbind(datos, parking_info)
-datos <- datos %>% select(-parkingSpace)
+datos <- datos %>% dplyr::select(-parkingSpace)
 names(datos)
 ```
 
@@ -454,7 +454,7 @@ datos <- datos %>%
 ### PCA
 
 ```{r}
-datos_pca = select(datos, - which(descProp$tipo == "binary"), - which(colnames(datos) %in% c("former_price", "price_drop_value", "price_drop_percentage", "propertyCode", "latitude", "longitude", "subTypology")))
+datos_pca = dplyr::select(datos, - which(descProp$tipo == "binary"), - which(colnames(datos) %in% c("former_price", "price_drop_value", "price_drop_percentage", "propertyCode", "latitude", "longitude", "subTypology")))
 res.pca <- PCA(datos_pca, scale.unit = TRUE, graph = FALSE, ncp = 10,  quali.sup = c(4, 8, 9, 11, 14))
 eig.val <- get_eigenvalue(res.pca)
 VPmedio = 100 * (1/nrow(eig.val))
