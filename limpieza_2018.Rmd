@@ -743,8 +743,8 @@ res.km <- NbClust(
   data      = coords_pca,    # <- así sí lo reconoce
   diss      = NULL,
   distance  = "euclidean",
-  min.nc    = 2,
-  max.nc    = 8,
+  min.nc    = 3,
+  max.nc    = 5,
   method    = "kmeans",
   index     = "all"
 )
@@ -890,8 +890,8 @@ plot(silhouette(clust4$clustering, dist_mat), col=colores2, border=NA, main = "K
 ```
 
 ```{r}
-metodos = c("hierarchical","kmeans","pam")
-validacion = suppressMessages(clValid(datos_Z, nClust = 2:6, metric = "euclidean", 
+metodos = c("kmeans","pam")
+validacion = suppressMessages(clValid(datos_Z, nClust = 2:5, metric = "euclidean", 
                       clMethods = metodos, 
                       validation = c("internal", "stability"),
                       method = "ward"))
@@ -900,7 +900,11 @@ summary(validacion)
 
 
 
-Elegimos el método de las k-means:
+Elegimos el método de las k-means, empleando 5 clusters. 
+
+Pese a no ser el número de clústers recomendado por silhouette, en global suele tener en casi todos los métodos un pico en este estadístico, además de bajar significativamente la variabilidad intracluster en comparación con solamente 2 clústers.
+
+Por ello, decidiremos usar el método de k-means con 5 clústers:
 
 ```{r}
 library(dplyr)   # lo ponemos arriba para que use las instrucciones de esta librería
@@ -924,6 +928,44 @@ for (i in sort(unique(distr_cluster$CLUSTER))) {
 perfiles = aggregate(datos_Z, by = list("cluster" = clust3$cluster), mean)
 kable(perfiles)
 ```
+
+-> Valores positivos indican que ese grupo (cluster) tiene mayores valores que la media general de esa variable.
+
+-> Valores negativos indican que ese grupo tiene valores inferiores a la media general.
+
+```{r}
+
+# Quitamos la columna "cluster" para aplicar la lógica solo a las variables numéricas
+perfiles_sin_cluster <- perfiles %>% dplyr::select(-cluster)
+
+# Creamos un resumen con el número de veces que está por encima o debajo de la media
+conteo_cluster <- perfiles_sin_cluster %>%
+  mutate(cluster = perfiles$cluster) %>%
+  rowwise() %>%
+  mutate(
+    por_encima = sum(c_across(everything()) > 0, na.rm = TRUE),
+    por_debajo = sum(c_across(everything()) < 0, na.rm = TRUE)
+  ) %>%
+  dplyr::select(cluster, por_encima, por_debajo)
+
+conteo_cluster
+```
+
+```{r}
+conteo_cluster <- perfiles_sin_cluster %>%
+  mutate(cluster = perfiles$cluster) %>%
+  rowwise() %>%
+  mutate(
+    total_vars = ncol(perfiles_sin_cluster),
+    por_encima = sum(c_across(everything()) > 0, na.rm = TRUE),
+    por_debajo = sum(c_across(everything()) < 0, na.rm = TRUE),
+    pct_encima = por_encima / total_vars,
+    pct_debajo = por_debajo / total_vars
+  ) %>%
+  select(cluster, por_encima, por_debajo, pct_encima, pct_debajo)
+```
+
+
 
 
 ```{r}
