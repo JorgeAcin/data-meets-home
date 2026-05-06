@@ -4,7 +4,7 @@ Análisis y predicción de precios de vivienda en Valencia utilizando datos de [
 
 📄 Memoria completa: `docs/Memoria_Data_Meets_Home.pdf`
 
-Proyecto desarrollado en la asignatura **Proyectos II** del tercer curso del Grado en Ciencia de Datos de la Universitat Politècnica de València (UPV).
+Proyecto desarrollado en la asignatura **Proyectos II** del segundo curso del Grado en Ciencia de Datos de la Universitat Politècnica de València (UPV).
 
 ---
 
