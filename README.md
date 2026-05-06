@@ -4,25 +4,32 @@ Análisis y predicción de precios de vivienda en Valencia utilizando datos de [
 
 📄 Memoria completa: `docs/Memoria_Data_Meets_Home.pdf`
 
-Proyecto desarrollado en la asignatura **Proyectos II** del segundo curso del Grado en Ciencia de Datos de la Universitat Politècnica de València (UPV).
+Proyecto desarrollado en la asignatura **Proyectos II** del tercer curso del Grado en Ciencia de Datos de la Universitat Politècnica de València (UPV).
 
 ---
 
 ## Estructura del Proyecto
 
 ```
+├── data/
+│   ├── Valencia_Sale.rda                    # Dataset Idealista 2018 (~20.000 viviendas)
+│   ├── propiedades_valencia.xlsx            # Dataset Idealista 2025 (sin distancia metro)
+│   ├── propiedades_valencia_2025.xlsx       # Dataset Idealista 2025 (con distancia metro)
+│   ├── estaciones_metro.xlsx                # Estaciones de metro/tranvía con coordenadas
+│   ├── barris.csv                           # Polígonos de barrios de Valencia
+│   ├── IPC.xlsx                             # Índice de Precios de Consumo (INE)
+│   ├── IPV.xlsx                             # Índice de Precios de Vivienda (INE)
+│   └── IPV_ComunidadValenciana.xlsx         # IPV específico Comunidad Valenciana (INE)
 ├── notebooks/
-│   ├── 01_api_scraping.ipynb          # Scraping de la API de Idealista (Python)
-│   ├── 02_distancia_metro.ipynb       # Cálculo de distancia al metro más cercano (Python)
-│   ├── 03_limpieza_2018.Rmd           # Limpieza del dataset 2018 (R)
-│   ├── 04_limpieza_2025.Rmd           # Limpieza del dataset 2025 (R)
-│   ├── 05_modelos.Rmd                 # Entrenamiento y evaluación de modelos (R)
-│   └── 06_ajuste_ipv.Rmd             # Ajuste con el IPV para predicción 2025 (R)
-├── scripts/
-│   ├── distanciametro.py              # Haversine distance calculation
-│   └── metrovalencia.py               # Overpass API query for metro stations
-├── data/                              # Datasets originales y auxiliares
-├── docs/                              # Memoria y presentación (PDF)
+│   ├── 01_api_scraping.py                 # Extracción de estaciones OSM + cálculo
+│   ├── 02_distanciametro.py                 # Extracción de estaciones OSM + cálculo Haversine
+│   ├── 03_limpieza_2018.Rmd                 # Limpieza dataset 2018
+│   ├── 04_limpieza_2025.Rmd                 # Limpieza dataset 2025
+│   ├── 05_limpieza18_con_modelos.Rmd        # Modelos predictivos (LR, RF, XGBoost, LightGBM)
+│   └── 06_ajuste_ipv.Rmd                    # Ajuste temporal con IPV
+├── docs/
+│   ├── Memoria_Data_Meets_Home.pdf
+│   └── Presentacion_Data_Meets_Home.pdf
 └── README.md
 ```
 
@@ -124,9 +131,9 @@ La corrección con el IPV reduce el error medio absoluto en ~€69.000, confirma
 | Miembro | Contribución |
 |---|---|
 | **Jorge Acín Zurita** | Limpieza 2018, entrenamiento/evaluación/selección de modelos predictivos, distancias al metro |
-| Robert Torres Mingarro | Limpieza 2018, ajuste de predicciones con IPV |
-| Mihai Cristian Mihalache Farcas | Limpieza 2025, análisis exploratorio, scraping de datos |
-| Rubén Tormo Piles | Limpieza 2025, análisis exploratorio, scraping de datos |
+| Robert Torres Mingarro | Limpieza 2018, ajuste de predicciones con IPV, entregas |
+| Mihai Cristian Mihalache Farcas | Limpieza 2025, análisis exploratorio, scraping de datos, clustering |
+| Rubén Tormo Piles | Limpieza 2025, análisis exploratorio, scraping de datos, clustering |
 
 ---
 
