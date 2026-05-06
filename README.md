@@ -123,7 +123,7 @@ La corrección con el IPV reduce el error medio absoluto en ~€69.000, confirma
 
 | Miembro | Contribución |
 |---|---|
-| **Jorge Acín Zurita** | Limpieza 2018, entrenamiento/evaluación/selección de modelos predictivos, cálculo de distancias al metro |
+| **Jorge Acín Zurita** | Limpieza 2018, entrenamiento/evaluación/selección de modelos predictivos, distancias al metro |
 | Robert Torres Mingarro | Limpieza 2018, ajuste de predicciones con IPV |
 | Mihai Cristian Mihalache Farcas | Limpieza 2025, análisis exploratorio, scraping de datos |
 | Rubén Tormo Piles | Limpieza 2025, análisis exploratorio, scraping de datos |
