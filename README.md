@@ -21,8 +21,8 @@ Proyecto desarrollado en la asignatura **Proyectos II** del tercer curso del Gra
 │   ├── IPV.xlsx                             # Índice de Precios de Vivienda (INE)
 │   └── IPV_ComunidadValenciana.xlsx         # IPV específico Comunidad Valenciana (INE)
 ├── notebooks/
-│   ├── 01_api_scraping.py                 # Extracción de estaciones OSM + cálculo
-│   ├── 02_distanciametro.py                 # Extracción de estaciones OSM + cálculo Haversine
+│   ├── 01_api_scraping.py                   # Extracción de estaciones OSM + cálculo
+│   ├── 02_distancia_metro.py                # Extracción de estaciones OSM + cálculo Haversine
 │   ├── 03_limpieza_2018.Rmd                 # Limpieza dataset 2018
 │   ├── 04_limpieza_2025.Rmd                 # Limpieza dataset 2025
 │   ├── 05_limpieza18_con_modelos.Rmd        # Modelos predictivos (LR, RF, XGBoost, LightGBM)
