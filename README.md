@@ -59,6 +59,9 @@ Comparar cómo ha cambiado la influencia de las características de una vivienda
 - **Correlaciones de Pearson**: La superficie construida pasa de una correlación de 0.76 (2018) a 0.58 (2025) con el precio — sigue siendo la más influyente pero pierde fuerza.
 - **Conclusión**: El mercado evoluciona hacia un modelo más complejo donde ya no basta con el tamaño; la distribución funcional, la accesibilidad y la centralidad ganan peso.
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/753bff7f-f65d-44ec-b367-89a52e28cb37" width="800" alt="Gráficos PCA 2018 y 2025" />
+
 ### 4. Clustering de Distritos (Objetivo 2)
 
 Estudiar la evolución del precio de la vivienda por distrito:
@@ -67,6 +70,10 @@ Estudiar la evolución del precio de la vivienda por distrito:
 - Clustering con K-Means: **5 clústeres en 2018**, **4 en 2025** — el mercado se ha simplificado en perfiles más definidos.
 - Distritos centrales como Ciutat Vella y L'Eixample muestran claros signos de **gentrificación**.
 - La mediana de precio casi se duplicó: **€148.000 (2018) → €330.000 (2025)**.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/d4bc5f74-1a8d-4a3a-83c7-d176fa2f25ba" width="800" alt="Clustering Valencia" />
+</p>
 
 ### 5. Modelos Predictivos (Objetivo 3)
 
@@ -84,6 +91,10 @@ Encontrar el mejor modelo para predecir el precio de una vivienda en Valencia co
 El modelo ganador usa **Random Forest con transformación logarítmica del precio y filtrado del percentil 95**, consiguiendo el menor MAE (€25.343). Las variables más importantes: superficie construida (25,6%), nº de baños (21,1%), distancia al centro (15,9%) y ascensor (10,2%).
 
 También se probaron modelos segmentados por clústeres (5 y 2 clústeres), pero ninguno superó al modelo global.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/3e6f2e19-ddbf-420e-ba73-c863e07caf93" width="900" alt="Importancia de Variables y Dispersión Random Forest" />
+</p>
 
 ### 6. Ajuste Temporal con IPV (Objetivo 4)
 
