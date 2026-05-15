@@ -2,7 +2,7 @@
 
 Análisis y predicción de precios de vivienda en Valencia utilizando datos de [Idealista](https://www.idealista.com/) (2018 y 2025). Combina scraping de APIs, limpieza de datos, análisis exploratorio, clustering de distritos y modelos de Machine Learning.
 
-📄 Memoria completa: `docs/Memoria_Data_Meets_Home.pdf`
+📄 [Haz clic aquí para ver la Memoria Completa (PDF)](./docs/Memoria_Data_Meets_Home.pdf)
 
 Proyecto desarrollado en la asignatura **Proyectos II** del tercer curso del Grado en Ciencia de Datos de la Universitat Politècnica de València (UPV).
 
