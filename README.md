@@ -2,6 +2,10 @@
 
 Análisis y predicción de precios de vivienda en Valencia utilizando datos de [Idealista](https://www.idealista.com/) (2018 y 2025). Combina scraping de APIs, limpieza de datos, análisis exploratorio, clustering de distritos y modelos de Machine Learning.
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/263ffb2a-daf1-4c50-b0a9-57c6b0a92f6d" width="600" />
+</p>
+
 📄 [Memoria Completa: Data Meets Home](./docs/Memoria_Data_Meets_Home.pdf)
 
 Proyecto desarrollado en la asignatura **Proyectos II** del tercer curso del Grado en Ciencia de Datos de la Universitat Politècnica de València (UPV).
@@ -58,6 +62,10 @@ Comparar cómo ha cambiado la influencia de las características de una vivienda
 - **PCA**: Las características físicas (superficie, habitaciones, baños) son los principales contribuyentes al precio en ambos años. Las variables de ubicación muestran dirección opuesta.
 - **Correlaciones de Pearson**: La superficie construida pasa de una correlación de 0.76 (2018) a 0.58 (2025) con el precio — sigue siendo la más influyente pero pierde fuerza.
 - **Conclusión**: El mercado evoluciona hacia un modelo más complejo donde ya no basta con el tamaño; la distribución funcional, la accesibilidad y la centralidad ganan peso.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/b416fcd9-465e-4b70-997f-a4b941fbf705" width="800" />
+</p>
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/753bff7f-f65d-44ec-b367-89a52e28cb37" width="800" alt="Gráficos PCA 2018 y 2025" />
