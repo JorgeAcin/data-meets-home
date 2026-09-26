@@ -4,7 +4,7 @@ Análisis y predicción de precios de vivienda en Valencia utilizando datos de [
 
 📄 [Memoria Completa: Data Meets Home](./docs/Memoria_Data_Meets_Home.pdf)
 
-Proyecto desarrollado en la asignatura **Proyectos II** del tercer curso del Grado en Ciencia de Datos de la Universitat Politècnica de València (UPV).
+Proyecto desarrollado en la asignatura **Proyectos II** del segundo curso del Grado en Ciencia de Datos de la Universitat Politècnica de València (UPV).
 
 ---
 
@@ -21,8 +21,8 @@ Proyecto desarrollado en la asignatura **Proyectos II** del tercer curso del Gra
 │   ├── IPV.xlsx                             # Índice de Precios de Vivienda (INE)
 │   └── IPV_ComunidadValenciana.xlsx         # IPV específico Comunidad Valenciana (INE)
 ├── notebooks/
-│   ├── 01_api_scraping.py                   # Extracción de estaciones OSM + cálculo
-│   ├── 02_distancia_metro.py                # Extracción de estaciones OSM + cálculo Haversine
+│   ├── 01_api_scraping.ipynb                # Extracción de viviendas en venta vía API de Idealista (OAuth)
+│   ├── 02_distancia_metro.ipynb             # Estaciones de metro/tranvía (Overpass/OSM) + distancia mínima Haversine
 │   ├── 03_limpieza_2018.Rmd                 # Limpieza dataset 2018
 │   ├── 04_limpieza_2025.Rmd                 # Limpieza dataset 2025
 │   ├── 05_limpieza18_con_modelos.Rmd        # Modelos predictivos (LR, RF, XGBoost, LightGBM)
@@ -90,9 +90,11 @@ Encontrar el mejor modelo para predecir el precio de una vivienda en Valencia co
 | Random Forest (optimizado) | 66.644 | 32.860 | 0,856 | Ajuste de hiperparámetros |
 | XGBoost | 70.005 | 34.859 | 0,840 | Buen rendimiento, no supera RF |
 | LightGBM | 72.355 | 39.015 | 0,829 | Similar a XGBoost |
-| **RF (filtrado + log)** | **38.747** | **25.343** | **0,836** | **Mejor modelo — P95 + LOGPRICE** |
+| RF (filtrado + log)¹ | 38.747 | 25.343 | 0,836 | P95 + LOGPRICE |
 
-El modelo ganador usa **Random Forest con transformación logarítmica del precio y filtrado del percentil 95**, consiguiendo el menor MAE (€25.343). Las variables más importantes: superficie construida (25,6%), nº de baños (21,1%), distancia al centro (15,9%) y ascensor (10,2%).
+¹ **No comparable directamente con el resto:** este modelo se entrenó y evaluó excluyendo el 5% de viviendas más caras (percentil 95), mientras que los demás se evaluaron sobre todos los datos. Su menor RMSE/MAE se debe en gran parte a eliminar los precios extremos, que son los que más error generan. Además, su R² (0,836) es inferior al del Random Forest optimizado (0,856).
+
+Sobre el conjunto completo, el mejor modelo es el **Random Forest optimizado** (R² 0,856, MAE €32.860). La variante con transformación logarítmica y filtrado del percentil 95 reduce el MAE a €25.343, pero solo es aplicable al 95% de viviendas de menor precio. Las variables más importantes: superficie construida (25,6%), nº de baños (21,1%), distancia al centro (15,9%) y ascensor (10,2%).
 
 También se probaron modelos segmentados por clústeres (5 y 2 clústeres), pero ninguno superó al modelo global.
 
