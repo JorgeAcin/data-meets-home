@@ -139,7 +139,7 @@ La corrección con el IPV reduce el error medio absoluto en ~€69.000, confirma
 2. Instalar las dependencias de R y Python.
 3. Ejecutar los notebooks en orden numérico (`01_` → `06_`).
 
-> **Nota:** El notebook `01_api_scraping.ipynb` requiere credenciales propias de la API de Idealista. Los datos ya procesados están en `data/`.
+> **Nota:** El notebook `01_api_scraping.ipynb` requiere credenciales propias de la API de Idealista, definidas en las variables de entorno `IDEALISTA_API_KEY` e `IDEALISTA_API_SECRET`. Los datos ya procesados están en `data/`.
 
 ---
 
