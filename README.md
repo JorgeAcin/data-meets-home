@@ -1,32 +1,32 @@
-# Data Meets Home — Predicción de Precios de Vivienda en Valencia
+# Data Meets Home — Housing Price Prediction in Valencia
 
-Análisis y predicción de precios de vivienda en Valencia utilizando datos de [Idealista](https://www.idealista.com/) (2018 y 2025). Combina scraping de APIs, limpieza de datos, análisis exploratorio, clustering de distritos y modelos de Machine Learning.
+Analysis and prediction of housing prices in Valencia using data from [Idealista](https://www.idealista.com/) (2018 and 2025). It combines API scraping, data cleaning, exploratory analysis, district clustering and Machine Learning models.
 
-📄 [Memoria Completa: Data Meets Home](./docs/Memoria_Data_Meets_Home.pdf)
+📄 [Full Report: Data Meets Home](./docs/Memoria_Data_Meets_Home.pdf)
 
-Proyecto desarrollado en la asignatura **Proyectos II** del segundo curso del Grado en Ciencia de Datos de la Universitat Politècnica de València (UPV).
+Project developed for the **Proyectos II** course in the second year of the Bachelor's Degree in Data Science at the Universitat Politècnica de València (UPV).
 
 ---
 
-## Estructura del Proyecto
+## Project Structure
 
 ```
 ├── data/
-│   ├── Valencia_Sale.rda                    # Dataset Idealista 2018 (~20.000 viviendas)
-│   ├── propiedades_valencia.xlsx            # Dataset Idealista 2025 (sin distancia metro)
-│   ├── propiedades_valencia_2025.xlsx       # Dataset Idealista 2025 (con distancia metro)
-│   ├── estaciones_metro.xlsx                # Estaciones de metro/tranvía con coordenadas
-│   ├── barris.csv                           # Polígonos de barrios de Valencia
-│   ├── IPC.xlsx                             # Índice de Precios de Consumo (INE)
-│   ├── IPV.xlsx                             # Índice de Precios de Vivienda (INE)
-│   └── IPV_ComunidadValenciana.xlsx         # IPV específico Comunidad Valenciana (INE)
+│   ├── Valencia_Sale.rda                    # Idealista 2018 dataset (~20.000 homes)
+│   ├── propiedades_valencia.xlsx            # Idealista 2025 dataset (without metro distance)
+│   ├── propiedades_valencia_2025.xlsx       # Idealista 2025 dataset (with metro distance)
+│   ├── estaciones_metro.xlsx                # Metro/tram stations with coordinates
+│   ├── barris.csv                           # Valencia neighbourhood polygons
+│   ├── IPC.xlsx                             # Consumer Price Index (INE)
+│   ├── IPV.xlsx                             # Housing Price Index (INE)
+│   └── IPV_ComunidadValenciana.xlsx         # Housing Price Index for the Valencian Community (INE)
 ├── notebooks/
-│   ├── 01_api_scraping.ipynb                # Extracción de viviendas en venta vía API de Idealista (OAuth)
-│   ├── 02_distancia_metro.ipynb             # Estaciones de metro/tranvía (Overpass/OSM) + distancia mínima Haversine
-│   ├── 03_limpieza_2018.Rmd                 # Limpieza dataset 2018
-│   ├── 04_limpieza_2025.Rmd                 # Limpieza dataset 2025
-│   ├── 05_limpieza18_con_modelos.Rmd        # Modelos predictivos (LR, RF, XGBoost, LightGBM)
-│   └── 06_ajuste_ipv.Rmd                    # Ajuste temporal con IPV
+│   ├── 01_api_scraping.ipynb                # Extraction of homes for sale via the Idealista API (OAuth)
+│   ├── 02_distancia_metro.ipynb             # Metro/tram stations (Overpass/OSM) + minimum Haversine distance
+│   ├── 03_limpieza_2018.Rmd                 # 2018 dataset cleaning
+│   ├── 04_limpieza_2025.Rmd                 # 2025 dataset cleaning
+│   ├── 05_limpieza18_con_modelos.Rmd        # Predictive models (LR, RF, XGBoost, LightGBM)
+│   └── 06_ajuste_ipv.Rmd                    # Temporal adjustment with the IPV
 ├── docs/
 │   ├── Memoria_Data_Meets_Home.pdf
 │   └── Presentacion_Data_Meets_Home.pdf
@@ -35,87 +35,88 @@ Proyecto desarrollado en la asignatura **Proyectos II** del segundo curso del Gr
 
 ---
 
-## Metodología
+## Methodology
 
-### 1. Obtención de Datos
+### 1. Data Collection
 
-- **API de Idealista**: Extracción de ~2.865 propiedades en venta en Valencia (2025) mediante la API oficial, con un script Python propio. El dataset de 2018 (~20.000 anuncios) se obtuvo de un repositorio público en formato .RDA.
-- **API de Overpass (OpenStreetMap)**: Obtención de 100+ ubicaciones de estaciones de metro y tranvía en el área metropolitana de Valencia para calcular la distancia al transporte público más cercano mediante la fórmula de Haversine.
-- **IPV (INE)**: Índice de Precios de la Vivienda por trimestre desde 2007 hasta 2024 para la Comunidad Valenciana.
+- **Idealista API**: Extraction of ~2.865 properties for sale in Valencia (2025) through the official API, using a custom Python script. The 2018 dataset (~20.000 listings) was obtained from a public repository in .RDA format.
+- **Overpass API (OpenStreetMap)**: Retrieval of 100+ metro and tram station locations in the Valencia metropolitan area to compute the distance to the nearest public transport stop using the Haversine formula.
+- **IPV (INE)**: Quarterly Housing Price Index from 2007 to 2024 for the Valencian Community.
 
-### 2. Limpieza y Preparación
+### 2. Cleaning and Preparation
 
-- Eliminación de duplicados y variables irrelevantes.
-- Parsing de columnas JSON anidadas (priceInfo, detailedType, parkingSpace).
-- Detección y tratamiento de valores anómalos (PCA multivariante para outliers en 2025).
-- Imputación de valores faltantes en la variable planta (mediana).
-- Feature engineering: ratio habitaciones/baños, rangos de precio discretizados, distancia mínima a estación de metro, variable `status` unificada, one-hot encoding de distritos.
+- Removal of duplicates and irrelevant variables.
+- Parsing of nested JSON columns (priceInfo, detailedType, parkingSpace).
+- Detection and treatment of anomalous values (multivariate PCA for outliers in 2025).
+- Imputation of missing values in the floor variable (median).
+- Feature engineering: bedrooms/bathrooms ratio, discretized price ranges, minimum distance to a metro station, unified `status` variable, one-hot encoding of districts.
 
-### 3. Análisis Exploratorio (Objetivo 1)
+### 3. Exploratory Analysis (Objective 1)
 
-Comparar cómo ha cambiado la influencia de las características de una vivienda sobre su precio entre 2018 y 2025:
+Compare how the influence of a home's features on its price changed between 2018 and 2025:
 
-- **PCA**: Las características físicas (superficie, habitaciones, baños) son los principales contribuyentes al precio en ambos años. Las variables de ubicación muestran dirección opuesta.
-- **Correlaciones de Pearson**: La superficie construida pasa de una correlación de 0.76 (2018) a 0.58 (2025) con el precio — sigue siendo la más influyente pero pierde fuerza.
-- **Conclusión**: El mercado evoluciona hacia un modelo más complejo donde ya no basta con el tamaño; la distribución funcional, la accesibilidad y la centralidad ganan peso.
+- **PCA**: Physical features (floor area, bedrooms, bathrooms) are the main contributors to price in both years. Location variables point in the opposite direction.
+- **Pearson correlations**: Built area goes from a correlation of 0,76 (2018) to 0,58 (2025) with price — it is still the most influential variable but loses strength.
+- **Conclusion**: The market is moving towards a more complex model where size alone is no longer enough; functional layout, accessibility and centrality gain weight.
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/b416fcd9-465e-4b70-997f-a4b941fbf705" width="800" />
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/753bff7f-f65d-44ec-b367-89a52e28cb37" width="800" alt="Gráficos PCA 2018 y 2025" />
-
-### 4. Clustering de Distritos (Objetivo 2)
-
-Estudiar la evolución del precio de la vivienda por distrito:
-
-- Se discretizó el precio en 3 rangos (Barato / Medio / Caro) con umbrales adaptados a cada año.
-- Clustering con K-Means: **5 clústeres en 2018**, **4 en 2025** — el mercado se ha simplificado en perfiles más definidos.
-- Distritos centrales como Ciutat Vella y L'Eixample muestran claros signos de **gentrificación**.
-- La mediana de precio casi se duplicó: **€148.000 (2018) → €330.000 (2025)**.
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/d4bc5f74-1a8d-4a3a-83c7-d176fa2f25ba" width="800" alt="Clustering Valencia" />
+  <img src="https://github.com/user-attachments/assets/753bff7f-f65d-44ec-b367-89a52e28cb37" width="800" alt="PCA plots 2018 and 2025" />
 </p>
 
-### 5. Modelos Predictivos (Objetivo 3)
+### 4. District Clustering (Objective 2)
 
-Encontrar el mejor modelo para predecir el precio de una vivienda en Valencia con datos de 2018:
+Study the evolution of housing prices by district:
 
-| Modelo | RMSE (€) | MAE (€) | R² | Notas |
+- Price was discretized into 3 ranges (Cheap / Medium / Expensive) with thresholds adapted to each year.
+- K-Means clustering: **5 clusters in 2018**, **4 in 2025** — the market has simplified into more clearly defined profiles.
+- Central districts such as Ciutat Vella and L'Eixample show clear signs of **gentrification**.
+- The median price almost doubled: **€148.000 (2018) → €330.000 (2025)**.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/d4bc5f74-1a8d-4a3a-83c7-d176fa2f25ba" width="800" alt="Valencia clustering" />
+</p>
+
+### 5. Predictive Models (Objective 3)
+
+Find the best model to predict the price of a home in Valencia using 2018 data:
+
+| Model | RMSE (€) | MAE (€) | R² | Notes |
 |---|---|---|---|---|
-| Regresión Lineal | 100.403 | 60.232 | 0,671 | Baseline |
-| Random Forest (inicial) | 67.661 | 32.814 | 0,851 | Mejora sustancial sobre LR |
-| Random Forest (optimizado) | 66.644 | 32.860 | 0,856 | Ajuste de hiperparámetros |
-| XGBoost | 70.005 | 34.859 | 0,840 | Buen rendimiento, no supera RF |
-| LightGBM | 72.355 | 39.015 | 0,829 | Similar a XGBoost |
-| RF (filtrado + log)¹ | 38.747 | 25.343 | 0,836 | P95 + LOGPRICE |
+| Linear Regression | 100.403 | 60.232 | 0,671 | Baseline |
+| Random Forest (initial) | 67.661 | 32.814 | 0,851 | Substantial improvement over LR |
+| Random Forest (tuned) | 66.644 | 32.860 | 0,856 | Hyperparameter tuning |
+| XGBoost | 70.005 | 34.859 | 0,840 | Good performance, does not beat RF |
+| LightGBM | 72.355 | 39.015 | 0,829 | Similar to XGBoost |
+| RF (filtered + log)¹ | 38.747 | 25.343 | 0,836 | P95 + LOGPRICE |
 
-¹ **No comparable directamente con el resto:** este modelo se entrenó y evaluó excluyendo el 5% de viviendas más caras (percentil 95), mientras que los demás se evaluaron sobre todos los datos. Su menor RMSE/MAE se debe en gran parte a eliminar los precios extremos, que son los que más error generan. Además, su R² (0,836) es inferior al del Random Forest optimizado (0,856).
+¹ **Not directly comparable with the others:** this model was trained and evaluated excluding the 5% most expensive homes (95th percentile), while the others were evaluated on the full data. Its lower RMSE/MAE is largely due to removing extreme prices, which are the ones that generate the most error. In addition, its R² (0,836) is lower than that of the tuned Random Forest (0,856).
 
-Sobre el conjunto completo, el mejor modelo es el **Random Forest optimizado** (R² 0,856, MAE €32.860). La variante con transformación logarítmica y filtrado del percentil 95 reduce el MAE a €25.343, pero solo es aplicable al 95% de viviendas de menor precio. Las variables más importantes: superficie construida (25,6%), nº de baños (21,1%), distancia al centro (15,9%) y ascensor (10,2%).
+On the full dataset, the best model is the **tuned Random Forest** (R² 0,856, MAE €32.860). The variant with log transformation and 95th-percentile filtering reduces the MAE to €25.343, but it only applies to the 95% of lowest-priced homes. The most important variables: built area (25,6%), number of bathrooms (21,1%), distance to the city centre (15,9%) and elevator (10,2%).
 
-También se probaron modelos segmentados por clústeres (5 y 2 clústeres), pero ninguno superó al modelo global.
+Cluster-segmented models (5 and 2 clusters) were also tested, but none outperformed the global model.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/3e6f2e19-ddbf-420e-ba73-c863e07caf93" width="900" alt="Importancia de Variables y Dispersión Random Forest" />
+  <img src="https://github.com/user-attachments/assets/3e6f2e19-ddbf-420e-ba73-c863e07caf93" width="900" alt="Random Forest variable importance and scatter plot" />
 </p>
 
-### 6. Ajuste Temporal con IPV (Objetivo 4)
+### 6. Temporal Adjustment with the IPV (Objective 4)
 
-Evaluar si el modelo de 2018 puede predecir precios de 2025 y corregir el desfase:
+Assess whether the 2018 model can predict 2025 prices and correct the time gap:
 
-| Escenario | RMSE (€) | MAE (€) | R² |
+| Scenario | RMSE (€) | MAE (€) | R² |
 |---|---|---|---|
-| Modelo 2018 → datos 2025 (sin corregir) | 317.013 | 213.572 | 0,676 |
-| Modelo 2018 → datos 2025 (corregido IPV ×1,5) | 235.324 | 144.677 | 0,676 |
+| 2018 model → 2025 data (uncorrected) | 317.013 | 213.572 | 0,676 |
+| 2018 model → 2025 data (IPV-corrected ×1,5) | 235.324 | 144.677 | 0,676 |
 
-La corrección con el IPV reduce el error medio absoluto en ~€69.000, confirmando que la estructura del modelo es válida pero necesita recalibración temporal. El error residual se debe a la complejidad inherente de predecir precios con 7 años de diferencia.
+The IPV correction reduces the mean absolute error by ~€69.000, confirming that the model's structure is valid but needs temporal recalibration. The remaining error is due to the inherent complexity of predicting prices 7 years apart.
 
 ---
 
-## Tecnologías
+## Technologies
 
 **R**: dplyr · ggplot2 · caret · randomForest · xgboost · lightgbm · sf · leaflet · FactoMineR · factoextra · NbClust · corrplot · readxl · jsonlite · tidyr
 
@@ -123,38 +124,38 @@ La corrección con el IPV reduce el error medio absoluto en ~€69.000, confirma
 
 ---
 
-## Informes Detallados (RPubs)
+## Detailed Reports (RPubs)
 
-- [Limpieza 2018](https://rpubs.com/mcmihala/limpieza2018)
-- [Limpieza 2025](https://rpubs.com/roberttorres/1315191)
+- [2018 Cleaning](https://rpubs.com/mcmihala/limpieza2018)
+- [2025 Cleaning](https://rpubs.com/roberttorres/1315191)
 - [Clustering](https://rpubs.com/mcmihala/1315148)
-- [Modelos Predictivos](https://rpubs.com/cachupinto/1315184)
-- [Ajuste IPV](https://rpubs.com/roberttorres/1315187)
+- [Predictive Models](https://rpubs.com/cachupinto/1315184)
+- [IPV Adjustment](https://rpubs.com/roberttorres/1315187)
 
 ---
 
-## Reproducción
+## Reproduction
 
-1. Clonar el repositorio.
-2. Instalar las dependencias de R y Python.
-3. Ejecutar los notebooks en orden numérico (`01_` → `06_`).
+1. Clone the repository.
+2. Install the R and Python dependencies.
+3. Run the notebooks in numerical order (`01_` → `06_`).
 
-> **Nota:** El notebook `01_api_scraping.ipynb` requiere credenciales propias de la API de Idealista, definidas en las variables de entorno `IDEALISTA_API_KEY` e `IDEALISTA_API_SECRET`. Los datos ya procesados están en `data/`.
+> **Note:** The `01_api_scraping.ipynb` notebook requires your own Idealista API credentials, set in the `IDEALISTA_API_KEY` and `IDEALISTA_API_SECRET` environment variables. The processed data is already available in `data/`.
 
 ---
 
-## Equipo
+## Team
 
-| Miembro | Contribución |
+| Member | Contribution |
 |---|---|
-| **Jorge Acín Zurita** | Limpieza 2018, entrenamiento/evaluación/selección de modelos predictivos, distancias al metro |
-| Robert Torres Mingarro | Limpieza 2018, ajuste de predicciones con IPV, entregas |
-| Mihai Cristian Mihalache Farcas | Limpieza 2025, análisis exploratorio, scraping de datos, clustering |
-| Rubén Tormo Piles | Limpieza 2025, análisis exploratorio, scraping de datos, clustering |
+| **Jorge Acín Zurita** | 2018 cleaning, training/evaluation/selection of predictive models, metro distances |
+| Robert Torres Mingarro | 2018 cleaning, IPV prediction adjustment, submissions |
+| Mihai Cristian Mihalache Farcas | 2025 cleaning, exploratory analysis, data scraping, clustering |
+| Rubén Tormo Piles | 2025 cleaning, exploratory analysis, data scraping, clustering |
 
 ---
 
-Proyecto académico — Grado en Ciencia de Datos, Universitat Politècnica de València (UPV).
+Academic project — Bachelor's Degree in Data Science, Universitat Politècnica de València (UPV).
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-jorgeacin-blue?logo=linkedin)](https://linkedin.com/in/jorgeacin)
 [![GitHub](https://img.shields.io/badge/GitHub-JorgeAcin-black?logo=github)](https://github.com/JorgeAcin)
