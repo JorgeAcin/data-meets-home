@@ -1,4 +1,4 @@
-# Data Meets Home — Housing Price Prediction in Valencia
+# Data Meets Home - Housing Price Prediction in Valencia
 
 Analysis and prediction of housing prices in Valencia using data from [Idealista](https://www.idealista.com/) (2018 and 2025). It combines API scraping, data cleaning, exploratory analysis, district clustering and Machine Learning models.
 
